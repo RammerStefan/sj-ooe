@@ -1,0 +1,2389 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#050b1a">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="SkiFlug OÖ">
+<title>SkiFlug OÖ – M3</title>
+<style>
+  :root{
+    --night:#050b1a; --panel:rgba(6,12,26,.90); --line:#2c5a8f;
+    --ink:#e8f0ff; --dim:#9db4d8; --accent:#ffd23f;
+    --good:#6fe3a0; --bad:#ff7a6e;
+    --mono:ui-monospace,"SF Mono","Cascadia Mono",Menlo,Consolas,"Courier New",monospace;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{height:100%;overflow:hidden;background:var(--night);
+    font-family:var(--mono);color:var(--ink);
+    -webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent;
+    overscroll-behavior:none}
+  #app{position:fixed;top:0;left:0;touch-action:none;overflow:hidden;background:var(--night)}
+  #stage{position:absolute;inset:0;touch-action:none}
+  canvas{display:block;width:100%;height:100%}
+  .chip{position:absolute;padding:6px 10px;background:var(--panel);
+    border:1px solid var(--line);font-size:13px;letter-spacing:.08em;
+    text-transform:uppercase;pointer-events:none;white-space:nowrap;border-radius:3px}
+  #windChip{top:10px;left:10px}
+  #speedChip{top:10px;right:10px}
+  #hint{position:absolute;left:50%;transform:translateX(-50%);bottom:16px;
+    padding:8px 14px;background:var(--panel);border:1px solid var(--line);
+    font-size:13px;letter-spacing:.06em;pointer-events:none;text-align:center;
+    max-width:92%;border-radius:3px}
+  #toast{position:absolute;left:50%;top:30%;transform:translateX(-50%);
+    font-size:clamp(28px,7vw,52px);color:var(--accent);letter-spacing:.06em;
+    text-shadow:0 0 22px rgba(255,210,63,.4);pointer-events:none;
+    opacity:0;transition:opacity .25s;white-space:nowrap}
+  .board{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+    width:min(440px,90%);background:var(--panel);border:1px solid var(--line);
+    box-shadow:0 0 0 4px rgba(5,11,26,.6),0 18px 50px rgba(0,0,0,.6);
+    padding:20px 18px;border-radius:4px;max-height:94%;overflow-y:auto;
+    touch-action:pan-y;-webkit-overflow-scrolling:touch}
+  .board .eyebrow{font-size:11px;letter-spacing:.28em;color:var(--dim);
+    text-transform:uppercase;margin-bottom:6px}
+  .board h1{font-size:clamp(24px,5.5vw,32px);letter-spacing:.04em;color:var(--accent);
+    line-height:1.05;margin-bottom:2px}
+  .board .sub{font-size:13px;color:var(--dim);margin-bottom:12px}
+  .rows{border-top:1px solid var(--line);margin-top:8px}
+  .rows .r{display:flex;justify-content:space-between;gap:12px;
+    padding:7px 0;border-bottom:1px solid rgba(44,90,143,.45);font-size:14px}
+  .rows .r b{color:var(--accent);font-weight:600;text-align:right}
+  .bigval{font-size:clamp(40px,12vw,64px);color:var(--accent);
+    letter-spacing:.02em;line-height:1;margin:10px 0 2px;
+    text-shadow:0 0 22px rgba(255,210,63,.25)}
+  .points{font-size:16px;color:var(--good);margin-left:10px;letter-spacing:.04em}
+  .judges{display:flex;gap:6px;margin:8px 0 2px;flex-wrap:wrap}
+  .judges .judge{flex:1;min-width:40px;text-align:center;padding:5px 0;
+    border:1px solid var(--line);font-size:14px;color:var(--ink);border-radius:3px}
+  .judges .judge.strike{opacity:.4;text-decoration:line-through;color:var(--dim)}
+  .scoreline{font-size:12px;color:var(--dim);margin-bottom:4px;letter-spacing:.04em}
+  .scoreline b{color:var(--accent);font-weight:600}
+  .btn.ghost{background:transparent;border:1px solid var(--accent);color:var(--accent)}
+  .btn.mini{padding:9px 6px;font-size:12px;letter-spacing:.06em}
+  .menurow{display:flex;gap:8px;margin-top:8px}
+  .menurow .btn{margin-top:0}
+  .plnames{display:flex;flex-direction:column;gap:5px;margin-top:8px}
+  .plnames .pl{display:flex;gap:6px;align-items:center}
+  .plnames input{flex:1;background:rgba(8,15,30,.6);border:1px solid var(--line);
+    color:var(--ink);font-family:var(--mono);font-size:13px;padding:7px 8px;border-radius:3px}
+  .plnames .dice{padding:7px 9px;background:transparent;border:1px solid var(--line);
+    color:var(--accent);border-radius:3px;cursor:pointer;font-size:14px}
+  .code{width:100%;height:54px;margin:4px 0 8px;background:rgba(8,15,30,.7);
+    border:1px solid var(--line);color:var(--dim);font-family:var(--mono);font-size:10px;
+    padding:7px;border-radius:3px;resize:none;word-break:break-all;touch-action:auto}
+  .netstatus{font-size:13px;color:var(--dim);text-align:center;margin:8px 0;
+    padding:7px;border:1px solid var(--line);border-radius:3px}
+  .netstatus.ok{color:var(--good);border-color:var(--good)}
+  .netstatus.err{color:var(--bad);border-color:var(--bad)}
+  .rows .r.me b{color:var(--good)}
+  .rows .r .rank{color:var(--accent);font-weight:700;margin-right:8px}
+  .rows .r.lead{background:rgba(255,210,63,.08)}
+  .attrlist{display:flex;flex-direction:column;gap:6px;margin:6px 0}
+  .attrlist.mini{gap:4px;margin:8px 0}
+  .attrrow{display:flex;align-items:center;gap:8px;font-size:13px}
+  .attrrow .nm{width:88px;color:var(--dim);text-transform:uppercase;letter-spacing:.06em;font-size:11px}
+  .attrrow .bar{flex:1;height:12px;background:rgba(8,15,30,.7);border:1px solid var(--line);
+    border-radius:3px;overflow:hidden}
+  .attrrow .bar i{display:block;height:100%;background:linear-gradient(90deg,#ffd23f,#ff8a3f)}
+  .attrrow .val{width:26px;text-align:right;color:var(--accent);font-weight:700}
+  .attrrow button{width:26px;height:24px;border:1px solid var(--line);background:transparent;
+    color:var(--accent);border-radius:3px;cursor:pointer;font-size:15px;line-height:1}
+  .ccrow{display:flex;gap:14px;margin:4px 0 2px;flex-wrap:wrap}
+  .swcol{display:flex;gap:5px;align-items:center}
+  .swcol .lbl{font-size:11px;color:var(--dim);text-transform:uppercase}
+  .sw{width:22px;height:22px;border-radius:50%;border:2px solid transparent;cursor:pointer}
+  .sw.sel{border-color:#fff}
+  .nextcard{border:1px solid var(--line);border-radius:3px;padding:10px;margin:4px 0;
+    background:rgba(8,15,30,.5)}
+  .nextcard b{color:var(--accent)}
+  .nextcard .typ{display:inline-block;font-size:10px;letter-spacing:.14em;color:var(--good);
+    text-transform:uppercase;margin-left:6px}
+  .statline{font-size:12px;color:var(--dim);margin:2px 0 4px;letter-spacing:.03em}
+  .lastline{font-size:12px;color:var(--ink);margin:2px 0 6px;padding:6px 8px;
+    border-left:2px solid var(--accent);background:rgba(255,210,63,.06)}
+  .lastline b{color:var(--accent)}
+  .unit{font-size:16px;color:var(--dim)}
+  .ctrl{margin:12px 0 4px;font-size:13px;color:var(--dim)}
+  .chk{display:flex;align-items:center;gap:8px;margin-top:10px}
+  .chk input{width:18px;height:18px;accent-color:var(--accent)}
+  input[type=range]{width:100%;accent-color:var(--accent);touch-action:auto}
+  input,textarea,button,select,label{touch-action:auto}
+  .seg{display:flex;gap:8px;margin-top:4px}
+  .hillgrid{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:4px;
+    max-height:148px;overflow-y:auto;padding-right:2px}
+  .hillgrid .segbtn{margin:0;text-align:left;padding:8px}
+  .hillgrid .segbtn b{color:inherit;font-weight:700;font-size:12px}
+  .segbtn{flex:1;padding:10px 6px;background:transparent;border:1px solid var(--line);
+    color:var(--dim);font-family:var(--mono);font-size:12px;letter-spacing:.06em;
+    text-transform:uppercase;cursor:pointer;border-radius:3px;line-height:1.35}
+  .segbtn.active{background:rgba(255,210,63,.12);border-color:var(--accent);color:var(--accent)}
+  .segbtn small{display:block;font-size:10px;letter-spacing:.12em;opacity:.8}
+  .btn{display:block;width:100%;margin-top:14px;padding:13px;border:0;
+    background:var(--accent);color:#0a1326;font-family:var(--mono);
+    font-size:15px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;
+    cursor:pointer;border-radius:3px}
+  .btn:active{transform:translateY(1px)}
+  .pulse{animation:pl 1.4s ease-in-out infinite;text-align:center;margin-top:12px;
+    color:var(--ink);font-size:14px;letter-spacing:.12em;text-transform:uppercase}
+  @keyframes pl{0%,100%{opacity:.45}50%{opacity:1}}
+  .ok{color:var(--good)} .warn{color:var(--bad)}
+  .hidden{display:none}
+</style>
+</head>
+<body>
+<div id="app">
+<div id="stage"><canvas id="cv"></canvas></div>
+
+<div id="windChip" class="chip">WIND ◀ 0.0 m/s</div>
+<div id="speedChip" class="chip hidden">0 km/h</div>
+<div id="hint" class="hidden"></div>
+<div id="toast"></div>
+
+<!-- ===================== Startmenü ===================== -->
+<div id="menu" class="board">
+  <div class="eyebrow">SkiFlug OÖ · M4 · Servas &amp; Schi Heil!</div>
+  <h1 id="mTitle">HINZENBACH</h1>
+  <div class="sub" id="mSub">HS90 · K-Punkt 85 m · Flutlicht-Nachtspringen</div>
+  <div class="ctrl">Modus</div>
+  <div class="seg" id="modeSeg">
+    <button class="segbtn active" data-mode="single">Einzel<small>Training</small></button>
+    <button class="segbtn" data-mode="local">Mehrspieler<small>1 Gerät · Hot-Seat</small></button>
+    <button class="segbtn" data-mode="net">WLAN<small>2 Geräte</small></button>
+    <button class="segbtn" data-mode="career">Karriere<small>Saisons</small></button>
+  </div>
+  <div id="compSetup" class="hidden">
+    <div class="sub" style="margin:6px 0">Hot-Seat: Alle springen reihum am selben Gerät und geben es weiter. Am Ende gibt's die Siegerehrung.</div>
+    <div class="ctrl">Springer <span id="plCountVal">2</span> · Durchgänge <span id="roundsVal">2</span></div>
+    <div class="seg" id="plSeg">
+      <button class="segbtn active" data-pl="2">2</button>
+      <button class="segbtn" data-pl="3">3</button>
+      <button class="segbtn" data-pl="4">4</button>
+      <button class="segbtn" data-pl="6">6</button>
+    </div>
+    <div class="seg" id="roundSeg" style="margin-top:6px">
+      <button class="segbtn" data-rounds="1">1 Durchgang</button>
+      <button class="segbtn active" data-rounds="2">2 Durchgänge</button>
+    </div>
+    <div id="plNames" class="plnames"></div>
+  </div>
+  <div class="ctrl">Schanze wählen</div>
+  <div id="hillGrid" class="hillgrid"></div>
+  <div class="ctrl">Steuerung</div>
+  <div class="seg" id="ctrlSeg">
+    <button class="segbtn active" data-ctrl="touch">Touch<small>Ziehen ↕</small></button>
+    <button class="segbtn" data-ctrl="gyro">Neigung<small>Gerät kippen</small></button>
+  </div>
+  <div class="ctrl">Empfindlichkeit <span id="sensVal">5</span>/10</div>
+  <input id="sens" type="range" min="1" max="10" value="5">
+  <label class="ctrl chk"><input id="aid" type="checkbox" checked> Absprung-Hilfe (Timing-Leiste)</label>
+  <label class="ctrl chk"><input id="snd" type="checkbox" checked> Soundeffekte (Wind, Publikum, Glocken)</label>
+  <label class="ctrl chk"><input id="comm" type="checkbox" checked> Kommentator Andi Silberberger</label>
+  <button id="startBtn" class="btn">▶ Schi Heil – los geht's!</button>
+  <div class="menurow">
+    <button id="installBtn" class="btn ghost hidden">📲 App installieren</button>
+    <button id="exportBtn" class="btn ghost mini">Speichern↓</button>
+    <button id="importBtn" class="btn ghost mini">Laden↑</button>
+  </div>
+  <input id="importFile" type="file" accept="application/json" class="hidden">
+</div>
+
+<!-- ===================== WLAN-Verbindung ===================== -->
+<div id="netMenu" class="board hidden">
+  <div class="eyebrow">SkiFlug OÖ · WLAN-Bewerb</div>
+  <h1>ONLINE-BEWERB</h1>
+  <div class="sub">Verbindung direkt zwischen den Geräten (WebRTC, kein Server). Codes per Hand austauschen – funktioniert im selben WLAN und übers Internet.</div>
+  <div class="seg" id="netRoleSeg">
+    <button class="segbtn active" data-role="host">Gastgeber<small>Raum eröffnen</small></button>
+    <button class="segbtn" data-role="guest">Beitreten<small>Code eingeben</small></button>
+  </div>
+  <div id="netHost">
+    <div class="ctrl">1) Deinen Einladungs-Code kopieren und schicken:</div>
+    <textarea id="hostOffer" class="code" readonly placeholder="Code wird erzeugt …"></textarea>
+    <div class="ctrl">2) Antwort-Code des Gasts hier einfügen:</div>
+    <textarea id="hostAnswer" class="code" placeholder="Antwort-Code einfügen …"></textarea>
+    <button id="hostConnectBtn" class="btn">Verbinden</button>
+  </div>
+  <div id="netGuest" class="hidden">
+    <div class="ctrl">1) Einladungs-Code des Gastgebers einfügen:</div>
+    <textarea id="guestOffer" class="code" placeholder="Einladungs-Code einfügen …"></textarea>
+    <button id="guestGenBtn" class="btn">Antwort-Code erzeugen</button>
+    <div class="ctrl">2) Diesen Antwort-Code zurückschicken:</div>
+    <textarea id="guestAnswer" class="code" readonly placeholder="erscheint nach Schritt 1 …"></textarea>
+  </div>
+  <div id="netStatus" class="netstatus">Nicht verbunden</div>
+  <button id="netBackBtn" class="btn ghost">Zurück</button>
+</div>
+
+<!-- ===================== Endstand (Bewerb) ===================== -->
+<div id="standings" class="board hidden">
+  <div class="eyebrow" id="stEye">Bewerb · Endstand</div>
+  <h1 id="stTitle">SIEGEREHRUNG</h1>
+  <div id="stList" class="rows"></div>
+  <button id="stAgainBtn" class="btn">Neuer Bewerb</button>
+  <button id="stMenuBtn" class="btn ghost">Zum Menü</button>
+</div>
+
+<!-- ===================== Karriere: Springer erstellen ===================== -->
+<div id="careerCreate" class="board hidden">
+  <div class="eyebrow">Karriere · Neuer Springer</div>
+  <h1>DEIN SPRINGER</h1>
+  <div class="plnames" style="margin-bottom:8px"><div class="pl">
+    <input id="ccName" placeholder="Name eingeben" maxlength="22" autocomplete="off">
+    <button id="ccDice" class="dice">🎲</button>
+  </div></div>
+  <div class="sub" id="ccHome">aus Hinzenbach (OÖ)</div>
+  <div class="ctrl">Anzug &amp; Helm</div>
+  <div id="ccColors" class="ccrow"></div>
+  <div class="ctrl">Attribute · noch <span id="ccPool">10</span> Punkte zu verteilen</div>
+  <div id="ccAttrs" class="attrlist"></div>
+  <button id="ccStartBtn" class="btn">Karriere starten</button>
+  <button id="ccBackBtn" class="btn ghost">Zurück</button>
+</div>
+
+<!-- ===================== Karriere: Hub ===================== -->
+<div id="careerHub" class="board hidden">
+  <div class="eyebrow" id="chSeason">Saison 1</div>
+  <h1 id="chName">SPRINGER</h1>
+  <div class="sub" id="chMeta">–</div>
+  <div id="chStats" class="statline">–</div>
+  <div id="chLast" class="lastline" style="display:none">–</div>
+  <div id="chAttrs" class="attrlist mini"></div>
+  <div class="ctrl">Nächster Bewerb</div>
+  <div id="chNext" class="nextcard">–</div>
+  <div class="ctrl">Weltcup-Gesamtstand</div>
+  <div id="chWC" class="rows"></div>
+  <button id="chJumpBtn" class="btn">▶ Zum Bewerb</button>
+  <div class="menurow">
+    <button id="chTrainBtn" class="btn ghost mini">Training</button>
+    <button id="chSaveBtn" class="btn ghost mini">Speichern</button>
+    <button id="chMenuBtn" class="btn ghost mini">Menü</button>
+  </div>
+</div>
+
+<!-- ===================== Karriere: Training ===================== -->
+<div id="careerTrain" class="board hidden">
+  <div class="eyebrow">Karriere · Trainingslager</div>
+  <h1>TRAINING</h1>
+  <div class="sub" id="ctInfo">Verteile deine Trainingspunkte. Übertraining kostet Form – Erholung gibt sie zurück.</div>
+  <div class="ctrl">Form: <span id="ctForm">–</span> · noch <span id="ctPool">0</span> Punkte</div>
+  <div id="ctAttrs" class="attrlist"></div>
+  <button id="ctRestBtn" class="btn ghost">😴 Erholungstag (+Form, kostet keinen Punkt)</button>
+  <button id="ctDoneBtn" class="btn">✓ Training abschließen</button>
+</div>
+
+<!-- ===================== Karriere: Bewerbsergebnis ===================== -->
+<div id="careerEventRes" class="board hidden">
+  <div class="eyebrow" id="ceEye">Bewerb · Ergebnis</div>
+  <h1 id="ceTitle">ERGEBNIS</h1>
+  <div class="bigval"><span id="cePlace">–</span><span class="unit"> Platz</span>
+    <span id="cePts" class="points">+0 WC</span></div>
+  <div id="ceList" class="rows"></div>
+  <button id="ceNextBtn" class="btn">Weiter</button>
+</div>
+
+<!-- ===================== Karriere: Saisonende ===================== -->
+<div id="careerSeasonEnd" class="board hidden">
+  <div class="eyebrow" id="seEye">Saison-Abschluss</div>
+  <h1 id="seTitle">SAISON</h1>
+  <div class="sub" id="seSub">–</div>
+  <div id="seList" class="rows"></div>
+  <button id="seNextBtn" class="btn">Nächste Saison ▶</button>
+  <button id="seMenuBtn" class="btn ghost">Karriere beenden</button>
+</div>
+
+<!-- ===================== Ergebnistafel ===================== -->
+<div id="result" class="board hidden">
+  <div class="eyebrow" id="rEye">Sprungrichtertafel</div>
+  <div class="bigval"><span id="rDist">0.0</span><span class="unit"> m</span>
+    <span id="rPoints" class="points">0 Pkt</span></div>
+  <div id="rHead" class="sub">–</div>
+  <div class="judges" id="rJudges"></div>
+  <div class="scoreline" id="rScoreLine"></div>
+  <div class="rows">
+    <div class="r"><span>Absprung</span><b id="rTake">–</b></div>
+    <div class="r"><span>Anfahrt</span><b id="rSpeed">–</b></div>
+    <div class="r"><span>Wind</span><b id="rWind">–</b></div>
+    <div class="r"><span>Landung</span><b id="rLand">–</b></div>
+    <div class="r"><span>Schanzen-Best</span><b id="rBest">–</b></div>
+  </div>
+  <button id="replayBtn" class="btn ghost">▶ Replay ansehen</button>
+  <button id="again" class="btn">Nächster Sprung</button>
+</div>
+</div>
+
+<script>
+"use strict";
+/* =====================================================================
+   SkiFlug OÖ – Milestone 4 (Karrieremodus)
+   M1: Physik · M2: 8 Schanzen + FIS-Wertung + Gyro + Replays
+   M3: PWA + Persistenz + Mehrspieler (lokal & WLAN/WebRTC)
+   M4: Karriere – Springer-Attribute (beeinflussen die Physik), Weltcup-
+       Kalender, KI-Welt (~48 Springer), Training, Saisons mit Alterskurve
+   ===================================================================== */
+const D2R = Math.PI/180, G = 9.81;
+const clamp = (v,a,b)=>Math.max(a,Math.min(b,v));
+const lerp  = (a,b,t)=>a+(b-a)*clamp(t,0,1);
+function mulberry32(seed){ let a=seed>>>0; return function(){
+  a|=0; a=(a+0x6D2B79F5)|0; let t=Math.imul(a^(a>>>15),1|a);
+  t=(t+Math.imul(t^(t>>>7),61|t))^t; return ((t^(t>>>14))>>>0)/4294967296; };}
+
+/* ====================== Schanzen-Definitionen ====================== */
+// Parametrisches Aufsprungprofil (steilster Bereich ~ um den K-Punkt, danach Auslauf)
+function makeProfile(profLen, steepMax){
+  return function(s){
+    const a=s/profLen;
+    if (a<0.14) return lerp(8, steepMax-3, a/0.14);
+    if (a<0.40) return lerp(steepMax-3, steepMax, (a-0.14)/0.26);
+    if (a<0.56) return steepMax;
+    if (a<0.66) return lerp(steepMax, steepMax-6, (a-0.56)/0.10);
+    if (a<0.82) return lerp(steepMax-6, 0, (a-0.66)/0.16);
+    return 0;
+  };
+}
+// Schanzen-Stammdaten (Anlauflängen & liftMul via calibM2.js numerisch kalibriert)
+// id,name,sub,k,hs,steepMax,inrunLen,upper,table,radius,liftMul,tableH,offset,view
+const HILL_LIST = [
+  ["schaerding","SCHÄRDING","HS55 · K-Punkt 50 m · Einsteiger­schanze am Inn",50,55,33,54,30,10.5,60,1.0,2.4,3.0,30,18],
+  ["freistadt","FREISTADT","HS72 · K-Punkt 65 m · Mühlviertler Hügelland",65,72,34,68,31,10.5,75,1.0,2.6,3.2,34,21],
+  ["hinzenbach","HINZENBACH","HS90 · K-Punkt 85 m · Flutlicht-Nachtspringen",85,90,35,81,32,10.5,90,1.0,3.0,3.5,42,26],
+  ["poestlingberg","LINZ-PÖSTLINGBERG","HS104 · K-Punkt 95 m · Stadtschanze, Donaublick",95,104,35,94,32,10.5,95,1.0,3.0,3.5,46,29],
+  ["steyr","STEYR","HS115 · K-Punkt 105 m · Altstadt-Panorama",105,115,36,98,33,10.5,100,1.0,3.1,3.6,50,31],
+  ["badischl","BAD ISCHL","HS131 · K-Punkt 120 m · Katrin, Salzkammergut",120,131,36,107,34,10.5,105,1.05,3.1,3.8,55,34],
+  ["windischgarsten","WINDISCHGARSTEN","HS138 · K-Punkt 125 m · Pyhrn-Priel",125,138,36,111,34,11.0,108,1.08,3.2,3.8,58,36],
+  ["obertraun","OBERTRAUN · DACHSTEIN","Skiflug · K-Punkt 220 m · HS245",220,245,37,134,35,11.0,110,1.42,3.2,4.0,64,40],
+];
+const HILL_DEFS = {};
+for (const r of HILL_LIST){
+  const [id,name,sub,k,hs,steepMax,inrunLen,upper,table,radius,liftMul,tableH,offset,vw,vh]=r;
+  const profLen=Math.ceil(hs*2.0);
+  const span=Math.max(8,Math.round(hs*0.08/5)*5);
+  HILL_DEFS[id]={
+    id,name,sub,k,hs,p:Math.round(k*0.88), distOffset:offset, tableH, liftMul, profLen,
+    inrun:{ length:inrunLen, upperAngle:upper, tableAngle:table, tableLen:(hs>180?8:6.5), radius },
+    profile:makeProfile(profLen,steepMax),
+    lineFrom:Math.max(5,Math.round((k*0.5)/5)*5), lineTo:Math.round((hs+span)/5)*5,
+    lineStep:(hs>150?10:5), labelStep:(hs>150?20:10),
+    view:{w:vw,h:vh}, mastStep:Math.max(20,Math.round(hs*0.35))
+  };
+}
+const HILL_ORDER = HILL_LIST.map(r=>r[0]);
+const DS = 0.5;
+function buildHill(def){
+  const H = Object.assign({}, def);
+  // Aufsprunghang
+  const LAND=[{x:0,y:-def.tableH,s:0,a:def.profile(0)}];
+  for (let s=0; s<def.profLen; s+=DS){
+    const a=def.profile(s)*D2R, p=LAND[LAND.length-1];
+    LAND.push({x:p.x+Math.cos(a)*DS, y:p.y-Math.sin(a)*DS, s:s+DS, a:def.profile(s+DS)});
+  }
+  H.LAND=LAND; H.LAND_END=LAND[LAND.length-1];
+  H.groundAt=function(x){
+    if (x<=0) return {y:-def.tableH,s:0,a:def.profile(0)};
+    if (x>=H.LAND_END.x) return {y:H.LAND_END.y,s:H.LAND_END.s,a:0};
+    let lo=0, hi=LAND.length-1;
+    while (hi-lo>1){ const m=(lo+hi)>>1; (LAND[m].x<=x)?lo=m:hi=m; }
+    const a=LAND[lo], b=LAND[hi], t=(x-a.x)/(b.x-a.x||1e-9);
+    return {y:lerp(a.y,b.y,t), s:lerp(a.s,b.s,t), a:lerp(a.a,b.a,t)};
+  };
+  H.pointAtDist=function(d){
+    const s=clamp(d-def.distOffset,0,H.LAND_END.s);
+    return LAND[clamp(Math.round(s/DS),0,LAND.length-1)];
+  };
+  // Anlauf
+  const S=def.inrun.length;
+  H.S_IN=S;
+  H.inrunAngle=function(s){
+    const arc=def.inrun.radius*(def.inrun.upperAngle-def.inrun.tableAngle)*D2R;
+    const straight=S-def.inrun.tableLen-arc;
+    if (s<straight) return def.inrun.upperAngle;
+    if (s<straight+arc) return lerp(def.inrun.upperAngle,def.inrun.tableAngle,(s-straight)/arc);
+    return def.inrun.tableAngle;
+  };
+  const INRUN=new Array(Math.round(S/DS)+1);
+  INRUN[INRUN.length-1]={x:0,y:0};
+  for (let i=INRUN.length-1;i>0;i--){
+    const s=i*DS, th=H.inrunAngle(s-DS/2)*D2R, p=INRUN[i];
+    INRUN[i-1]={x:p.x-Math.cos(th)*DS, y:p.y+Math.sin(th)*DS};
+  }
+  H.INRUN=INRUN; H.GATE=INRUN[0];
+  H.inrunPos=function(s){
+    const f=clamp(s/DS,0,INRUN.length-1), i=Math.floor(f), t=f-i;
+    const a=INRUN[i], b=INRUN[Math.min(i+1,INRUN.length-1)];
+    return {x:lerp(a.x,b.x,t), y:lerp(a.y,b.y,t)};
+  };
+  H.bgTerrainY=function(x){
+    if (x>=0) return H.groundAt(x).y;
+    return lerp(H.GATE.y-12,-def.tableH,(x-H.GATE.x)/(0-H.GATE.x));
+  };
+  // Auslauf-Beginn (erste flache Stelle)
+  let cs=def.profLen-40;
+  for (let s=40;s<def.profLen;s+=2){ if (def.profile(s)<=0){ cs=s; break; } }
+  H.crowdS=cs+6;
+  // Flutlichtmasten
+  H.MASTS=[];
+  for (let s=10; s<cs+30 && s<def.profLen-10; s+=def.mastStep){
+    const p=LAND[Math.round(s/DS)]; H.MASTS.push({x:p.x,y:p.y});
+  }
+  H.MASTS.push(H.inrunPos(S*0.15), H.inrunPos(S*0.55));
+  // Wald
+  const rng=mulberry32(def.k*101);
+  H.TREES=[];
+  for (let x=H.GATE.x-26; x<H.LAND_END.x+36; x+=4+rng()*5){
+    if (x>-16 && x<12) continue;
+    H.TREES.push({x, dy:1+rng()*6, h:3+rng()*3.5, w:1.4+rng()*1.2});
+  }
+  return H;
+}
+const HILLS={};
+for (const id of HILL_ORDER) HILLS[id]=buildHill(HILL_DEFS[id]);
+let CUR=HILLS.hinzenbach;
+
+const PHYS = {
+  muInrun:0.03, kAirInrun:0.0013,
+  vJump:2.9,
+  KLmax:0.0052, KD0:0.0047, KD2:3.0e-6,
+  leanMin:-25, leanMax:60,
+  flareWindow:0.7, tapAccept:1.0,
+  dt:1/120
+};
+
+/* ====================== Kommentator: Andi Silberberger ======================
+   Eigene Figur (kein realer Kommentator). Web Speech API; auf iOS muss die
+   Synthese durch die erste Touch-Geste "aufgeweckt" werden.            */
+const Andi = {
+  on:true, ready:false, voice:null, last:0, lastLine:"",
+  // Satz-Pool je Ereignis – österreichisch-euphorisch
+  lines:{
+    start:["So, auf geht's, owe vom Balken — passts auf!","Er kummt, er kummt, jetzt wird's ernst!","Und ab in die Spur, hui geht des dahin!","Servas, jetzt schau ma amoi wos do geht!"],
+    takeoffPerfect:["Heast, wos für a Absprung — bombastisch!","Sauba owe vom Tisch, des is a Granate!","Perfekt, perfekt, perfekt — Weltklasse, sog i eich!","Der Absprung woar a Traum, leiwand!"],
+    takeoffGood:["Guata Absprung, des schaut scho fein aus!","Ordentlich am Tisch, des passt eh!","Najo, solide owe — do geht no wos!"],
+    takeoffPoor:["Hui, do woar er a Spur zu spät, schod ums Eck!","Den Absprung hot er vaschlofn — najo!","Geh bitte, do is eahm der Tisch davongrennt!","Oje, do woar nix mit'm Timing!"],
+    flightHigh:["Heast, schau wia der dahinsegelt!","Der fliagt und fliagt und fliagt — a Wahnsinn!","Der steht in da Luft wia angnagelt, sensationell!","Des is a Flug wia aus'm Bilderbuch!"],
+    flightLow:["Oje, den drückt's owe, des wird kurz!","Er findt kan Auftrieb — najo, schod!","Do fehlt da Druck unter de Ski, schwierig!"],
+    overK:["Über'n K-Punkt — und es geht weiter!","Heast is des a Weite, der lasst olle stehn!","Wahnsinn, der fliagt am K-Punkt vorbei wia nix!"],
+    overHS:["Wahnsinn, über die Hill Size — i wir narrisch!","A Monsterweite, sowos hob i selten gsehn!","Heast, des is irre — der hört goar nimma auf!","Sensationell, des sprengt die Schanze!"],
+    telemark:["Und der Telemark sitzt — bilderbuchmäßig, bravo!","Sauba gstellt, perfekt glandet, traumhaft!","Mustergültig owe, do gibt's die Topnoten!"],
+    landOk:["Glandet is glandet, weiter geht's!","Auf beide Ski owe — des zählt amoi!","Najo, ka Telemark, aber gstandn is er!"],
+    crash:["Oje oje, do hot's eahm zaumghaut!","Sturz! Des tuat weh beim bloßen Zuaschaun!","Geh, do is er glegn — aufstehn, weiter geht's!","Uiuiui, des is goar nia guat ausgangen!"],
+    record:["Schanzenrekord — i wir narrisch do herobn!","Bestweite, sensationell, des is ja leiwand!","Neue Bestmarke — heast, des feiern ma mit am Most!","Rekord — ganz Oberösterreich steht Kopf!"]
+  },
+  // manche Ereignisse mit einem kurzen "Doppler" für mehr Schmäh
+  followups:{ overHS:["Heast!","Unglaublich!","I fass es net!"],
+              record:["Bravo, bravo!","Leiwand!"],
+              takeoffPerfect:["Jawoi!"], crash:["Najo …"] },
+  pick(key){ const a=this.lines[key]; if(!a||!a.length) return null;
+    let s; for(let i=0;i<4;i++){ s=a[(Math.random()*a.length)|0]; if(s!==this.lastLine) break; }
+    this.lastLine=s; return s; },
+  pickVoice(){
+    if (!("speechSynthesis" in window)) return;
+    const vs=speechSynthesis.getVoices();
+    this.voice = vs.find(v=>/de[-_]AT/i.test(v.lang))           // Österreichisch bevorzugt
+             || vs.find(v=>/Markus|Petra|Vicki/i.test(v.name)&&/de/i.test(v.lang))
+             || vs.find(v=>/^de\b|de[-_]DE/i.test(v.lang))      // sonst Deutsch
+             || vs.find(v=>/de/i.test(v.lang)) || null;
+  },
+  unlock(){                                                     // nach 1. Touch (iOS)
+    if (this.ready || !("speechSynthesis" in window)) return;
+    try{ const u=new SpeechSynthesisUtterance(" "); u.volume=0; speechSynthesis.speak(u); }catch(e){}
+    this.pickVoice(); this.ready=true;
+  },
+  utter(text,rate,pitch){
+    const u=new SpeechSynthesisUtterance(text);
+    if (this.voice) u.voice=this.voice;
+    u.lang=this.voice?this.voice.lang:"de-DE";
+    u.rate=rate; u.pitch=pitch; u.volume=1;
+    try{ speechSynthesis.speak(u); }catch(e){}
+  },
+  say(key,{force=false,prio=false}={}){
+    if (!this.on || !("speechSynthesis" in window)) return;
+    const now=performance.now();
+    if (!force && now-this.last<1300) return;                  // nicht überreden
+    const line=this.pick(key); if(!line) return;
+    if (prio) speechSynthesis.cancel();
+    // Grund-Energie hoch; Höhepunkte schneller & höher
+    let rate=1.2, pitch=1.12;
+    const hype = (key==="overHS"||key==="record");
+    if (hype){ rate=1.32; pitch=1.22; }
+    else if (key==="takeoffPerfect"||key==="overK"||key==="flightHigh"){ rate=1.26; pitch=1.18; }
+    else if (key==="crash"){ rate=1.22; pitch=0.96; }
+    this.utter(line,rate,pitch);
+    // optionaler kurzer Nachsatz für Schmäh
+    const fu=this.followups[key];
+    if (fu && (hype || Math.random()<0.4))
+      this.utter(fu[(Math.random()*fu.length)|0], rate+0.06, pitch+0.05);
+    this.last=now;
+  }
+};
+if ("speechSynthesis" in window){
+  speechSynthesis.onvoiceschanged=()=>Andi.pickVoice();
+  Andi.pickVoice();
+}
+
+/* ====================== Sound-Engine (Web Audio, prozedural, eingebettet) ======================
+   Keine Audiodateien: alle Geräusche werden live im Browser synthetisiert.
+   Auf iOS muss der AudioContext durch die erste Touch-Geste gestartet werden. */
+const Snd = {
+  on:true, ctx:null, master:null, windGain:null, windFilter:null, crowdGain:null, ready:false,
+  noiseBuf:null,
+  init(){
+    if (this.ready) return;
+    const AC=window.AudioContext||window.webkitAudioContext; if(!AC) return;
+    const ctx=new AC(); this.ctx=ctx;
+    this.master=ctx.createGain(); this.master.gain.value=0.9; this.master.connect(ctx.destination);
+    // 2 s rosa-ish Rauschen als Quelle für Wind/Publikum
+    const len=ctx.sampleRate*2, b=ctx.createBuffer(1,len,ctx.sampleRate), d=b.getChannelData(0);
+    let last=0;
+    for (let i=0;i<len;i++){ const w=Math.random()*2-1; last=(last+0.02*w)/1.02; d[i]=last*3.2; }
+    this.noiseBuf=b;
+    // Dauer-Wind (leise, Tonhöhe/Lautstärke folgen dem Tempo)
+    const ws=ctx.createBufferSource(); ws.buffer=b; ws.loop=true;
+    this.windFilter=ctx.createBiquadFilter(); this.windFilter.type="bandpass";
+    this.windFilter.frequency.value=500; this.windFilter.Q.value=0.7;
+    this.windGain=ctx.createGain(); this.windGain.gain.value=0.0;
+    ws.connect(this.windFilter); this.windFilter.connect(this.windGain); this.windGain.connect(this.master); ws.start();
+    // Publikums-Grundrauschen (sehr leise, schwillt bei Highlights an)
+    const cs=ctx.createBufferSource(); cs.buffer=b; cs.loop=true;
+    const cf=ctx.createBiquadFilter(); cf.type="lowpass"; cf.frequency.value=900;
+    this.crowdGain=ctx.createGain(); this.crowdGain.gain.value=0.025;
+    cs.connect(cf); cf.connect(this.crowdGain); this.crowdGain.connect(this.master); cs.start();
+    this.ready=true;
+  },
+  unlock(){ if(!this.ready) this.init();
+    if (this.ctx && this.ctx.state==="suspended") this.ctx.resume(); },
+  noise(dur,type,freq,Q,g,gMul){
+    if(!this.on||!this.ctx) return;
+    const ctx=this.ctx, s=ctx.createBufferSource(); s.buffer=this.noiseBuf; s.loop=true;
+    const f=ctx.createBiquadFilter(); f.type=type; f.frequency.value=freq; if(Q)f.Q.value=Q;
+    const ga=ctx.createGain(); const t=ctx.currentTime;
+    ga.gain.setValueAtTime(0.0001,t);
+    ga.gain.exponentialRampToValueAtTime(g,t+0.012);
+    ga.gain.exponentialRampToValueAtTime(0.0001,t+dur);
+    s.connect(f); f.connect(ga); ga.connect(this.master);
+    s.start(t); s.stop(t+dur+0.05);
+  },
+  tone(freq,dur,type,g,bendTo){
+    if(!this.on||!this.ctx) return;
+    const ctx=this.ctx, o=ctx.createOscillator(), ga=ctx.createGain(), t=ctx.currentTime;
+    o.type=type||"triangle"; o.frequency.setValueAtTime(freq,t);
+    if (bendTo) o.frequency.exponentialRampToValueAtTime(bendTo,t+dur);
+    ga.gain.setValueAtTime(0.0001,t);
+    ga.gain.exponentialRampToValueAtTime(g||0.2,t+0.01);
+    ga.gain.exponentialRampToValueAtTime(0.0001,t+dur);
+    o.connect(ga); ga.connect(this.master); o.start(t); o.stop(t+dur+0.05);
+  },
+  // --- Ereignis-Sounds ---
+  gate(){ this.tone(660,0.08,"square",0.18); this.tone(880,0.10,"square",0.14); },
+  whoosh(q){ this.noise(0.5,"bandpass",1400,1.2,0.18+0.12*q); }, // Absprung-Pop/Luftriss
+  takeoff(q){ this.whoosh(q); this.tone(180+120*q,0.18,"sawtooth",0.16,90); },
+  thud(){ this.noise(0.22,"lowpass",220,0,0.5); this.tone(70,0.18,"sine",0.3,45); },
+  crash(){ this.noise(0.6,"lowpass",500,0,0.6); this.tone(120,0.5,"sawtooth",0.25,40);
+    setTimeout(()=>this.noise(0.35,"lowpass",300,0,0.4),90); },
+  telemarkDing(){ this.tone(1320,0.18,"triangle",0.22); this.tone(1760,0.22,"sine",0.16); },
+  cowbell(){ // zwei Glocken-Teiltöne
+    this.tone(540,0.25,"square",0.12,520); this.tone(800,0.25,"square",0.10,770); },
+  cheer(big){ // Publikumsjubel: kurzes Anschwellen + Glocken
+    if(!this.ctx) return;
+    const g=this.crowdGain.gain, t=this.ctx.currentTime, peak=big?0.32:0.16;
+    g.cancelScheduledValues(t);
+    g.setValueAtTime(g.value,t);
+    g.linearRampToValueAtTime(peak,t+0.15);
+    g.linearRampToValueAtTime(0.025,t+(big?2.4:1.4));
+    this.noise(big?1.6:1.0,"bandpass",1600,0.6,big?0.22:0.13);
+    let n=big?4:2; for(let i=0;i<n;i++) setTimeout(()=>this.cowbell(), 120+i*150+Math.random()*80);
+  },
+  // Dauer-Wind je Frame aktualisieren
+  setWind(speed,active){
+    if(!this.ctx||!this.windGain) return;
+    const t=this.ctx.currentTime;
+    const target=active? Math.min(0.22, 0.02+speed*0.02) : 0.0;
+    this.windGain.gain.setTargetAtTime(target,t,0.08);
+    this.windFilter.frequency.setTargetAtTime(300+speed*22, t, 0.1);
+  }
+};
+
+/* ====================== Gyro-Steuerung (DeviceOrientation) ====================== */
+const Gyro = {
+  active:false, raw:0, base:0, have:false,
+  onOrient(e){
+    // beta = Vor/Zurück-Neigung; im Querformat ist gamma relevanter -> beide mischen
+    const b = (e.beta==null?0:e.beta), g=(e.gamma==null?0:e.gamma);
+    Gyro.raw = ROT ? g : b;
+    Gyro.have = true;
+  },
+  async enable(){
+    if (!window.DeviceOrientationEvent) return false;
+    try{
+      if (typeof DeviceOrientationEvent.requestPermission==="function"){
+        const res=await DeviceOrientationEvent.requestPermission();   // iOS 13+
+        if (res!=="granted") return false;
+      }
+    }catch(e){ return false; }
+    if (!this.active){ window.addEventListener("deviceorientation",this.onOrient,true); this.active=true; }
+    return true;
+  },
+  calibrate(){ this.base=this.raw; },     // aktuelle Lage = Nullpunkt
+};
+
+/* ====================== Wertung (FIS-nah) ====================== */
+function meterValue(k){ return k<100?2.0 : k<170?1.8 : 1.2; }   // Punkte pro Meter
+function scoreJump(){
+  // Weitenpunkte: 60 am K-Punkt + Meterwert je Meter Abweichung
+  const distPts = Math.max(0, 60 + (game.dist-CUR.k)*meterValue(CUR.k));
+  // Haltungsnoten: 5 Richter à max 20. Basis aus Flug-Ruhe + Telemark, kleine Streuung.
+  let base;
+  if (game.crashed) base = 2 + game.rng()*4;
+  else {
+    const wob = clamp(game.wobble,0,60);            // Flug-Unruhe (Summe |ΔLage|)
+    let st = 19 - wob*0.10;                          // ruhiger Flug -> höhere Note
+    if (game.landType==="Telemark!") st += 1.0;
+    else if (game.landType==="Beidbeinig") st -= 1.5;
+    else if (/Wacklig/.test(game.landType)) st -= 3.0;
+    base = clamp(st, 6, 20);
+  }
+  const judges=[];
+  for (let i=0;i<5;i++) judges.push(clamp(Math.round((base+(game.rng()*1.6-0.8))*2)/2,0,20));
+  const sorted=[...judges].sort((a,b)=>a-b);
+  const stylePts = sorted[1]+sorted[2]+sorted[3];    // höchste & niedrigste gestrichen
+  return { distPts, judges, stylePts, total: distPts+stylePts };
+}
+
+/* ====================== Spielzustand ====================== */
+const game = {
+  state:"menu", acc:0, last:0,
+  rng:mulberry32(1), jumpNo:0,
+  sIn:0, v:0, x:0, y:0, vx:0, vy:0,
+  B:30, pose:"tuck", spin:0,
+  tookOff:false, tapped:false, takeoffQ:0, takeoffSpeed:0, tapF:0,
+  flareT:-99, flightT:0, diveT:0,
+  saidK:false, saidHS:false, saidFlight:false,
+  crashed:false, landType:"", dist:0, vPerp:0, wobble:0, score:null,
+  wind:0, windTarget:0, windBase:0, gustT:0, hintShown:0,
+  // Replay-Aufzeichnung
+  recording:true, ftick:0, rec:null
+};
+const bests={};                 // Bestweite je Schanze
+const bestScores={};            // Bestpunktzahl je Schanze
+const replays={};               // letzter Replay je Schanze
+let replay=null;                // aktiver Replay (Wiedergabe) oder null
+
+/* ====================== Oberösterreich-Flair ====================== */
+const OOE = {
+  vornamen:["Sepp","Hansi","Toni","Andi","Pepi","Hias","Franzl","Resi","Vroni","Gerti",
+    "Steffi","Maxi","Mausi","Wolfi","Schorsch","Bertl","Loisl","Mitzi","Burgi","Reserl",
+    "Flori","Gust","Poidl","Nazi","Fini","Liesl","Stoffl","Xandi"],
+  nachnamen:["Huber","Mayrhofer","Gruber","Hinterleitner","Stadlbauer","Pichler","Aichinger",
+    "Wimmer","Hofbauer","Leitner","Brunbauer","Eder","Steinkogler","Aigner","Doppler",
+    "Schwoazenecka","Penninger","Mooslechner","Reiterbauer","Holzknecht","Promberger"],
+  orte:["Schärding","Ried","Eferding","Grieskirchen","Vöcklabruck","Gmunden","Steyr","Enns",
+    "Perg","Freistadt","Rohrbach","Bad Ischl","Kirchdorf","Wels","Linz","Mondsee","Gosau",
+    "Ebensee","St. Wolfgang","Hallstatt","Windischgarsten","Hinterstoder"],
+  randName(){ const r=()=>this.rng?this.rng():Math.random();
+    return this.vornamen[(r()*this.vornamen.length)|0]+" "+this.nachnamen[(r()*this.nachnamen.length)|0]; },
+  randOrt(){ const r=()=>this.rng?this.rng():Math.random(); return this.orte[(r()*this.orte.length)|0]; }
+};
+
+/* ====================== Bewerb / Mehrspieler ====================== */
+const comp = {
+  active:false, mode:"single",   // single | local | net
+  players:[],                    // {id, name, local:bool, scores:[], dists:[]}
+  rounds:2, round:0, idx:0,      // aktueller Durchgang / Spielerindex
+  hill:"hinzenbach", seedBase:0,
+  myId:null
+};
+function compReset(){ comp.active=false; comp.players=[]; comp.round=0; comp.idx=0; }
+function compSorted(){
+  return [...comp.players].map(p=>({p, tot:p.scores.reduce((a,b)=>a+b,0),
+    best:Math.max(0,...p.dists)})).sort((a,b)=>b.tot-a.tot);
+}
+
+/* ====================== KARRIERE ====================== */
+const ATTR_KEYS=["power","flight","stability","telemark","nerves"];
+const ATTR_NAMES={power:"Sprungkraft",flight:"Flugstil",stability:"Stabilität",
+  telemark:"Telemark",nerves:"Nerven"};
+const WC_POINTS=[100,80,60,50,45,40,36,32,29,26,24,22,20,18,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1];
+const SUITS=["#d7263d","#3a86ff","#2bb673","#ffd23f","#8e44ad","#e8e8e8","#ff7a3f","#1a2336"];
+const HELMETS=["#ffd23f","#d7263d","#1a2336","#3a86ff","#2bb673","#e8e8e8"];
+
+const career = {
+  active:false, inEvent:false, player:null, world:[], season:1,
+  eventIdx:0, calendar:[], wc:{}, eventScores:{}, eventRound:0, seedBase:0, mod:null,
+  stats:{wins:0,podiums:0,starts:0,titles:0,bestJump:0,careerPts:0,trained:0,seasons:0,
+    sWins:0,sPodiums:0,sStarts:0},
+  lastResult:null, _trainPool:0, _trainedAt:-1
+};
+function nrm(a){ return clamp(a/10,0,1); }
+
+function makeCalendar(season){
+  // ~10 Bewerbe: Auftakt klein -> groß, OÖ-Tournee-Block, Skiflug-Finale Obertraun
+  const c=[];
+  const add=(hillId,type)=>c.push({hillId,type,name:HILL_DEFS[hillId].name.split(" · ")[0],
+    rounds:(HILL_DEFS[hillId].hs>180?2:2)});
+  add("schaerding","wc"); add("freistadt","wc"); add("steyr","wc");
+  // OÖ-Tournee (4 Schanzen, Highlight)
+  ["poestlingberg","badischl","windischgarsten","hinzenbach"].forEach((h,i)=>
+    c.push({hillId:h,type:"tournee",name:HILL_DEFS[h].name.split(" · ")[0],rounds:2,
+      tournee:true,tourneeNr:i+1}));
+  add("freistadt","wc"); add("steyr","wc");
+  // Skiflug-Finale
+  c.push({hillId:"obertraun",type:"flying",name:"Obertraun",rounds:2,final:true});
+  return c;
+}
+function genJumper(rng,opts={}){
+  const lvl=opts.level!=null?opts.level:0.3+rng()*0.5;
+  const a={};
+  for(const k of ATTR_KEYS) a[k]=clamp(Math.round((lvl*10)+(rng()*4-2)),1,10);
+  return { id:opts.id||("ai"+((rng()*1e6)|0)), name:opts.name||OOE.randName(),
+    nation:"AUT", home:OOE.randOrt(), attrs:a, age:opts.age!=null?opts.age:(18+(rng()*12)|0),
+    form:0.5, ai:true };
+}
+function genWorld(rng,n){
+  const w=[];
+  for(let i=0;i<n;i++){
+    // Skill-Verteilung: ein paar Stars, viel Mittelfeld
+    const r=rng(); const level = r<0.12?0.78+rng()*0.18 : r<0.5?0.5+rng()*0.25 : 0.3+rng()*0.25;
+    w.push(genJumper(rng,{level}));
+  }
+  return w;
+}
+function jumperSkill(j){
+  const a=j.attrs;
+  return clamp(0.5*nrm(a.power)+0.32*nrm(a.flight)+0.18*nrm(a.stability),0,1);
+}
+// KI-Sprung: liefert {dist,total,crashed} – kalibriert via careersim.js
+function aiJump(rng,hill,j){
+  const sk=jumperSkill(j);
+  const lo=hill.k*0.80, hi=hill.hs+2;
+  const formAdj=(j.form-0.5)*0.08;
+  let frac=clamp(sk+formAdj,0,1.05);
+  const spread=(1.4-nrm(j.attrs.nerves))*(hill.hs>180?0.10:0.07);
+  frac+=(rng()*2-1)*spread+(rng()*2-1)*0.025;
+  let dist=Math.round(lerp(lo,hi,clamp(frac,0,1.08))*2)/2;
+  const crashed=rng()<(0.02+(1-nrm(j.attrs.telemark))*0.05+(1-nrm(j.attrs.nerves))*0.03)*0.4;
+  const distPts=Math.max(0,60+(dist-hill.k)*meterValue(hill.k));
+  let style=clamp(11+nrm(j.attrs.telemark)*6+nrm(j.attrs.stability)*2+(rng()*2-1)*1.5,6,20);
+  if (crashed) style=clamp(3+rng()*3,0,20);
+  const stylePts=style*3;
+  return { dist, crashed, total: crashed? distPts*0.3+stylePts : distPts+stylePts };
+}
+// Attribut-Modifikatoren für den Spieler-Sprung (greifen in die Physik)
+function playerMods(){
+  const a=career.player.attrs, f=career.player.form;
+  return {
+    powerMul: 0.90 + 0.20*nrm(a.power) + (f-0.5)*0.05,
+    flightMul:0.94 + 0.12*nrm(a.flight) + (f-0.5)*0.04,
+    windResist:1 - 0.32*nrm(a.stability),
+    flareWindow:0.5 + 0.5*nrm(a.telemark),
+    nervesVar:(1-nrm(a.nerves))*0.18
+  };
+}
+function awardWC(ranking){
+  ranking.forEach((e,i)=>{ if(i<30){ career.wc[e.id]=(career.wc[e.id]||0)+WC_POINTS[i]; } });
+}
+function wcSorted(){
+  const all=[career.player,...career.world];
+  return all.map(j=>({j,pts:career.wc[j.id]||0})).sort((a,b)=>b.pts-a.pts);
+}
+function ageCurvePeak(age){ // Multiplikator 0.6..1.0 je nach Alter
+  if (age<20) return lerp(0.78,0.95,(age-16)/4);
+  if (age<=29) return lerp(0.95,1.0,(age-20)/9);
+  if (age<34) return lerp(1.0,0.9,(age-29)/5);
+  return lerp(0.9,0.6,clamp((age-34)/6,0,1));
+}
+function endSeasonProgression(rng){
+  // Aufstieg/Abbau der KI nach Alterskurve; Rücktritte; Nachwuchs
+  const keep=[];
+  for(const j of career.world){
+    j.age++;
+    const peak=ageCurvePeak(j.age);
+    for(const k of ATTR_KEYS){
+      const target=clamp(j.attrs[k]*(0.5+peak*0.6),1,10);
+      j.attrs[k]=clamp(Math.round(j.attrs[k]+(target-j.attrs[k])*0.4+(rng()*1.2-0.6)),1,10);
+    }
+    if (j.age>35 && rng()<0.5) continue;       // Rücktritt
+    if (j.age>38) continue;
+    keep.push(j);
+  }
+  while(keep.length<career.world.length)        // Nachwuchs auffüllen
+    keep.push(genJumper(rng,{age:17+(rng()*2|0),level:0.3+rng()*0.4}));
+  career.world=keep;
+  // Spieler altert ebenfalls (Attribute leicht von Form/Alter beeinflusst, kein Auto-Abbau der Basiswerte)
+  career.player.age++;
+}
+
+const looseSki = {on:false,x:0,y:0,vx:0,vy:0,rot:0,vr:0};
+function rollWind(){
+  game.windBase = game.rng()*3.8-1.2;
+  game.windTarget = game.windBase; game.wind = game.windBase;
+}
+
+/* ====================== Physik ====================== */
+function clShape(a){
+  if (a<=-10) return -0.35;
+  if (a<0)    return lerp(-0.35,0,(a+10)/10);
+  if (a<32)   return Math.sin((a/32)*Math.PI/2);
+  if (a<60)   return lerp(1,0.4,(a-32)/28);
+  return 0.35;
+}
+function stepWind(dt){
+  game.gustT -= dt;
+  if (game.gustT<=0){ game.gustT = 1.5+game.rng()*2.5;
+    game.windTarget = game.windBase + (game.rng()*1.4-0.7); }
+  game.wind += (game.windTarget-game.wind)*clamp(dt*0.9,0,1);
+}
+function tte(){ return (CUR.S_IN-game.sIn)/Math.max(game.v,0.5); }
+function doTakeoff(q){
+  game.tookOff = true; game.takeoffQ = q;
+  game.v *= (0.955+0.045*q);
+  game.takeoffSpeed = game.v;
+  const ta = -CUR.inrun.tableAngle*D2R;
+  game.x = 0; game.y = 0;
+  game.vx = Math.cos(ta)*game.v; game.vy = Math.sin(ta)*game.v;
+  const m=career.mod;
+  let vj = PHYS.vJump*(0.25+0.75*q);
+  if (m){ vj *= m.powerMul; if (m.nervesVar) vj *= (1+(game.rng()*2-1)*m.nervesVar); }
+  game.vx += Math.sin(-ta)*vj; game.vy += Math.cos(-ta)*vj;
+  game.B = 26 + (1-q)*12;
+  game.pose="flight"; game.flightT=0; game.diveT=0; game.flareT=-99;
+  game.state="flight";
+  if (game.rec){ game.rec.takeoffQ=q; game.lastB=game.B; }
+  showToast(Math.round(q*100)+" % Absprung", 0.9);
+  Andi.say(q>0.7?"takeoffPerfect":q>0.45?"takeoffGood":"takeoffPoor",{prio:true,force:true});
+  Snd.takeoff(q);
+  if (game.hintShown<3){ setHint("Ziehen ↕ = Fluglage · 2. Finger = Telemark",2.5); game.hintShown++; }
+}
+function physStep(dt){
+  stepWind(dt);
+  if (game.state==="inrun"){
+    const th = CUR.inrunAngle(game.sIn)*D2R;
+    game.v += (G*(Math.sin(th)-PHYS.muInrun*Math.cos(th)) - PHYS.kAirInrun*game.v*game.v)*dt;
+    game.sIn += game.v*dt;
+    const p = CUR.inrunPos(game.sIn);
+    game.x=p.x; game.y=p.y;
+    if (game.sIn>=CUR.S_IN){
+      const q = replay ? replay.takeoffQ : (game.tapped?game.takeoffQ:0.12);
+      doTakeoff(q);
+    }
+    return;
+  }
+  if (game.state==="flight"){
+    // Replay: aufgezeichnete Fluglage einspielen; sonst aktuelle Lage aufzeichnen
+    if (replay){ const v=replay.leans[game.ftick]; if (v!=null) game.B=v; }
+    else if (game.rec){ game.rec.leans.push(game.B);
+      if (game.ftick>0) game.wobble+=Math.abs(game.B-game.lastB); game.lastB=game.B; }
+    game.ftick++;
+    game.flightT += dt;
+    if (replay && replay.flareTick>=0 && game.ftick>=replay.flareTick && game.flareT<0)
+      game.flareT=game.flightT;
+    const head=game.wind * (career.mod? career.mod.windResist : 1);
+    const wX=-head, wY=(head>=0? head*0.65 : head*0.35);
+    const vax=game.vx-wX, vay=game.vy-wY;
+    const va=Math.hypot(vax,vay)||1e-6;
+    const gamma=Math.atan2(vay,vax)/D2R;
+    const aoa=game.B-gamma;
+    const flared = (game.flightT-game.flareT) < 2;
+    let kl=PHYS.KLmax*CUR.liftMul*(career.mod?career.mod.flightMul:1)*clShape(aoa),
+        kd=PHYS.KD0+PHYS.KD2*Math.pow(aoa-8,2);
+    if (flared){ kl*=0.55; kd*=1.5; }
+    const ux=vax/va, uy=vay/va;
+    game.vx += ((-uy)*kl - ux*kd)*va*va*dt;
+    game.vy += (( ux)*kl - uy*kd)*va*va*dt - G*dt;
+    game.x += game.vx*dt; game.y += game.vy*dt;
+    // Live-Kommentar während des Flugs
+    if (game.x>3){
+      const curD = CUR.groundAt(game.x).s + CUR.distOffset;
+      if (!game.saidHS && curD>=CUR.hs){ game.saidHS=true; Andi.say("overHS",{prio:true,force:true}); Snd.cheer(true); }
+      else if (!game.saidK && curD>=CUR.k){ game.saidK=true; Andi.say("overK",{prio:true,force:true}); Snd.cheer(false); }
+      else if (!game.saidFlight && game.flightT>0.9){
+        game.saidFlight=true;
+        Andi.say(game.vy<-7 ? "flightLow" : "flightHigh");
+      }
+    }
+    if (aoa < -9){ game.diveT+=dt; if (game.diveT>0.5) return crashAir(); }
+    else game.diveT=Math.max(0,game.diveT-dt*2);
+    if (game.x>0.5){
+      const gr=CUR.groundAt(game.x);
+      if (game.y<=gr.y) touchdown();
+    }
+    if (game.y<-400) touchdown();
+    return;
+  }
+  if (game.state==="slide"){
+    const gr=CUR.groundAt(game.x), sl=-gr.a*D2R;
+    const tx=Math.cos(sl), ty=Math.sin(sl);
+    let vt=game.vx*tx+game.vy*ty;
+    const mu = (gr.a<2 ? (game.crashed?0.5:0.16) : (game.crashed?0.30:0.045));
+    vt += (G*Math.sin(sl) - mu*G*Math.cos(sl)*Math.sign(vt) - 0.002*vt*vt)*dt;
+    if (vt<0) vt=0;
+    game.vx=vt*tx; game.vy=vt*ty;
+    game.x+=game.vx*dt; game.y=CUR.groundAt(game.x).y;
+    if (game.crashed) game.spin += dt*9*Math.max(0.4,vt/15);
+    if (looseSki.on){
+      looseSki.vy-=G*dt; looseSki.x+=looseSki.vx*dt; looseSki.y+=looseSki.vy*dt;
+      looseSki.rot+=looseSki.vr*dt;
+      const lg=CUR.groundAt(looseSki.x);
+      if (looseSki.y<lg.y){ looseSki.y=lg.y;
+        looseSki.vy*=-0.3; looseSki.vx*=0.7; looseSki.vr*=0.6;
+        if (Math.abs(looseSki.vy)<0.6){ looseSki.vy=0; looseSki.vx*=0.92;
+          looseSki.rot=-lg.a*D2R; } }
+    }
+    if (vt<0.8 || game.x>CUR.LAND_END.x-3) finishJump();
+  }
+}
+function crashAir(){ game.crashed=true; game.landType="Sturz – zu viel Vorlage!"; touchdown(true); }
+function touchdown(forced){
+  const gd=CUR.groundAt(game.x);
+  game.dist = Math.round((gd.s+CUR.distOffset)*2)/2;
+  const sl=-gd.a*D2R, tx=Math.cos(sl), ty=Math.sin(sl);
+  game.vPerp = Math.abs(game.vx*(-ty)+game.vy*tx);
+  const dtFlare = game.flightT-game.flareT;
+  if (!forced && !game.crashed){
+    if (game.vPerp>9.5){ game.crashed=true; game.landType="Sturz – Aufprall zu hart"; }
+    else if (dtFlare>=0 && dtFlare<=(career.mod?career.mod.flareWindow:PHYS.flareWindow) && game.vPerp<8.2){
+      game.landType="Telemark!"; game.pose="telemark";
+    } else if (game.vPerp<5.2){ game.landType="Beidbeinig"; game.pose="land2"; }
+    else if (game.vPerp<7.2){ game.landType="Wacklig – ohne Telemark"; game.pose="land2"; }
+    else { game.crashed=true; game.landType="Sturz – Landung verschlafen"; }
+  }
+  if (game.crashed){
+    game.pose="crash";
+    looseSki.on=true; looseSki.x=game.x; looseSki.y=gd.y+0.5;
+    looseSki.vx=game.vx*0.7; looseSki.vy=Math.abs(game.vy)*0.4+2;
+    looseSki.rot=0; looseSki.vr=6;
+  }
+  const vt=Math.max(4, game.vx*tx+game.vy*ty)*(game.crashed?0.55:0.92);
+  game.vx=vt*tx; game.vy=vt*ty; game.y=gd.y;
+  game.state="slide";
+  showToast(game.crashed ? game.dist.toFixed(1)+" m ✕" : game.dist.toFixed(1)+" m", 1.6);
+  Andi.say(game.crashed ? "crash" : (game.landType==="Telemark!" ? "telemark" : "landOk"),
+           {prio:true,force:true});
+  if (game.crashed) Snd.crash();
+  else { Snd.thud(); if (game.landType==="Telemark!"){ Snd.telemarkDing(); Snd.cheer(false); } }
+}
+
+/* ====================== Canvas / Kamera ====================== */
+const cv=document.getElementById("cv"), c=cv.getContext("2d");
+let W=0,H=0,DPR=1,ROT=false,skyGrad=null;
+const app=document.getElementById("app");
+function resize(){
+  DPR=Math.min(3,window.devicePixelRatio||1);
+  ROT = innerHeight>innerWidth;
+  W = ROT? innerHeight : innerWidth;
+  H = ROT? innerWidth  : innerHeight;
+  app.style.width=W+"px"; app.style.height=H+"px";
+  app.style.transformOrigin="top left";
+  app.style.transform = ROT? "rotate(90deg) translateY(-100%)" : "none";
+  cv.width=W*DPR; cv.height=H*DPR; c.setTransform(DPR,0,0,DPR,0,0);
+  skyGrad=null;
+}
+addEventListener("resize",resize);
+addEventListener("orientationchange",()=>setTimeout(resize,80));
+resize();
+
+const cam={x:20,y:-10,ppm:6};
+function camTarget(){
+  if (game.state==="menu" || game.state==="result"){
+    const minX=CUR.GATE.x-10, maxX=CUR.LAND_END.x*0.92,
+          minY=CUR.LAND_END.y-5, maxY=CUR.GATE.y+14;
+    const ppm=Math.min(W/(maxX-minX), H/(maxY-minY));
+    return {x:(minX+maxX)/2, y:(minY+maxY)/2, ppm};
+  }
+  // Zoom-Stufen: nah am Tisch (Absprung gut sichtbar) -> weiter im Flug (Lage/Bahn lesbar)
+  const flightPPM = clamp(Math.min(W/CUR.view.w,        H/CUR.view.h),        2.2,13);
+  const closePPM  = clamp(Math.min(W/(CUR.view.w*0.52), H/(CUR.view.h*0.52)), 2.2,22);
+  let ppm, lead=0.14, up=0.05;
+  if (game.state==="inrun"){
+    ppm=closePPM; lead=0.06; up=0.02;                       // dicht dran, Tischkante im Blick
+  } else if (game.state==="flight"){
+    // Erst ~0,35 s nah halten (Absprungpunkt!), dann smooth auf Flug-Zoom rauszoomen
+    const tt=clamp((game.flightT-0.35)/1.1,0,1);
+    const e=tt*tt*(3-2*tt);                                 // smoothstep
+    ppm=lerp(closePPM,flightPPM,e);
+    lead=lerp(0.08,0.16,e); up=lerp(0.02,0.06,e);
+  } else { ppm=flightPPM; }                                 // slide
+  return {x:game.x+(W/ppm)*lead, y:game.y-(H/ppm)*up, ppm};
+}
+const wx=x=>(x-cam.x)*cam.ppm+W/2;
+const wy=y=>(cam.y-y)*cam.ppm+H/2;
+
+/* ====================== Szenen-Deko ====================== */
+const deko=mulberry32(42);
+const stars=Array.from({length:150},()=>({x:deko(),y:deko()*0.55,r:deko()<0.15?1.6:1,tw:deko()*6.28}));
+const crowd=Array.from({length:90},()=>({o:deko()*44,h:1.45+deko()*0.4,
+  c:["#d7263d","#3a86ff","#ffd23f","#7bdff2","#caffbf","#f4a261"][Math.floor(deko()*6)]}));
+const FLAGS=Array.from({length:6},(_,i)=>({o:4+i*7.5+deko()*2}));
+const FLAKES=Array.from({length:140},()=>({u:deko(),v:deko(),d:0.4+deko()*0.6}));
+
+/* ====================== Rendering ====================== */
+function drawSky(t){
+  if (!skyGrad){
+    skyGrad=c.createLinearGradient(0,0,0,H);
+    skyGrad.addColorStop(0,"#02050e"); skyGrad.addColorStop(0.35,"#071226");
+    skyGrad.addColorStop(0.65,"#0d2147"); skyGrad.addColorStop(0.85,"#17345f");
+    skyGrad.addColorStop(1,"#1d406e");
+  }
+  c.fillStyle=skyGrad; c.fillRect(0,0,W,H);
+  for (const st of stars){
+    const sx=((st.x*1.6-cam.x*0.0008)%1+1)%1*W;
+    const sy=st.y*H;
+    const a=0.35+0.5*Math.abs(Math.sin(t*0.8+st.tw));
+    c.fillStyle="rgba(210,225,255,"+a.toFixed(2)+")";
+    c.fillRect(sx,sy,st.r,st.r);
+  }
+  const mx=W*0.84-cam.x*0.05, my=H*0.14;
+  const mg=c.createRadialGradient(mx,my,2,mx,my,60);
+  mg.addColorStop(0,"rgba(235,242,255,.5)"); mg.addColorStop(1,"rgba(235,242,255,0)");
+  c.fillStyle=mg; c.beginPath(); c.arc(mx,my,60,0,7); c.fill();
+  c.fillStyle="#e9f1ff"; c.beginPath(); c.arc(mx,my,11,0,7); c.fill();
+  c.fillStyle="rgba(150,170,210,.5)";
+  c.beginPath(); c.arc(mx-3,my-2,2.4,0,7); c.fill();
+  c.beginPath(); c.arc(mx+4,my+3,1.7,0,7); c.fill();
+}
+function ridge(par, base, amp, col){
+  c.fillStyle=col; c.beginPath();
+  c.moveTo(0,H);
+  for (let i=0;i<=24;i++){
+    const xx=i/24*W;
+    const k=i*0.9+cam.x*0.004*par;
+    c.lineTo(xx, H*base - H*amp*(0.5+0.32*Math.sin(k)+0.22*Math.sin(k*2.3+1.7)));
+  }
+  c.lineTo(W,H); c.closePath(); c.fill();
+}
+function drawForest(){
+  for (const tr of CUR.TREES){
+    const bx=wx(tr.x), by=wy(CUR.bgTerrainY(tr.x)+tr.dy);
+    if (bx<-40||bx>W+40) continue;
+    const h=tr.h*cam.ppm, w=tr.w*cam.ppm;
+    c.fillStyle="#0c1d33";
+    c.beginPath(); c.moveTo(bx,by-h);
+    c.lineTo(bx-w,by); c.lineTo(bx+w,by); c.closePath(); c.fill();
+    c.fillStyle="#14304f";
+    c.beginPath(); c.moveTo(bx,by-h);
+    c.lineTo(bx-w*0.55,by-h*0.38); c.lineTo(bx+w*0.55,by-h*0.38);
+    c.closePath(); c.fill();
+    c.strokeStyle="rgba(225,236,255,.35)"; c.lineWidth=1;
+    c.beginPath(); c.moveTo(bx,by-h); c.lineTo(bx-w*0.4,by-h*0.45); c.stroke();
+  }
+}
+function drawSnowBody(){
+  const grd=c.createLinearGradient(0,wy(5),0,H);
+  grd.addColorStop(0,"#e7eefb"); grd.addColorStop(0.5,"#c2d2ec"); grd.addColorStop(1,"#7e95bd");
+  c.fillStyle=grd;
+  c.beginPath();
+  c.moveTo(wx(CUR.GATE.x-14), wy(CUR.GATE.y-13));
+  c.lineTo(wx(CUR.GATE.x), wy(CUR.GATE.y-12));
+  c.lineTo(wx(0), wy(-CUR.tableH));
+  for (let i=0;i<CUR.LAND.length;i+=2) c.lineTo(wx(CUR.LAND[i].x),wy(CUR.LAND[i].y));
+  c.lineTo(wx(CUR.LAND_END.x+36), wy(CUR.LAND_END.y));
+  c.lineTo(wx(CUR.LAND_END.x+36), H+6); c.lineTo(wx(CUR.GATE.x-14), H+6);
+  c.closePath(); c.fill();
+  c.strokeStyle="rgba(255,255,255,.9)"; c.lineWidth=Math.max(1.5,cam.ppm*0.16);
+  c.beginPath(); c.moveTo(wx(0),wy(-CUR.tableH));
+  for (let i=0;i<CUR.LAND.length;i+=2) c.lineTo(wx(CUR.LAND[i].x),wy(CUR.LAND[i].y));
+  c.stroke();
+  c.strokeStyle="rgba(120,150,200,.5)"; c.lineWidth=1;
+  c.beginPath(); c.moveTo(wx(0),wy(-CUR.tableH)-cam.ppm*0.5);
+  for (let i=0;i<CUR.LAND.length;i+=4) c.lineTo(wx(CUR.LAND[i].x),wy(CUR.LAND[i].y)-cam.ppm*0.5);
+  c.stroke();
+}
+function drawLightPools(){
+  c.save(); c.globalCompositeOperation="lighter";
+  for (const m of CUR.MASTS){
+    const bx=wx(m.x), by=wy(m.y);
+    const lg=c.createRadialGradient(bx,by,1,bx,by,14*cam.ppm);
+    lg.addColorStop(0,"rgba(255,228,150,.16)"); lg.addColorStop(1,"rgba(255,228,150,0)");
+    c.fillStyle=lg;
+    c.beginPath(); c.ellipse(bx,by,14*cam.ppm,5*cam.ppm,0,0,7); c.fill();
+  }
+  c.restore();
+}
+function drawMeterLines(){
+  c.font="600 "+Math.max(11,cam.ppm*1.4).toFixed(0)+"px "+
+    getComputedStyle(document.body).getPropertyValue("--mono");
+  c.textBaseline="middle";
+  for (let d=CUR.lineFrom; d<=CUR.lineTo; d+=CUR.lineStep){
+    const p=CUR.pointAtDist(d), big=(d%CUR.labelStep===0);
+    let col="rgba(70,100,150,.75)", wlen=big?4.5:2.5, lw=Math.max(1.2,cam.ppm*0.14), label=null;
+    if (d===CUR.p){col="#5aa2ff";wlen=6.5;lw=Math.max(2,cam.ppm*0.22);label="P";}
+    if (d===CUR.k){col="#ff4d5e";wlen=7.5;lw=Math.max(2.5,cam.ppm*0.26);label="K";}
+    if (d===CUR.hs){col="#52e08a";wlen=7.5;lw=Math.max(2.5,cam.ppm*0.26);label="HS";}
+    c.strokeStyle=col; c.lineWidth=lw;
+    c.beginPath(); c.moveTo(wx(p.x),wy(p.y));
+    c.lineTo(wx(p.x)+wlen*cam.ppm*0.9, wy(p.y)+wlen*cam.ppm*0.34); c.stroke();
+    if (cam.ppm>1.6 && (big||label)){
+      c.fillStyle=label?col:"rgba(155,180,216,.9)";
+      c.fillText((label? label+" " : "")+d,
+        wx(p.x)+(wlen+1.2)*cam.ppm*0.9, wy(p.y)+(wlen+1.2)*cam.ppm*0.34);
+    }
+  }
+}
+function drawInrunTower(){
+  c.strokeStyle="#26405f"; c.lineWidth=Math.max(1.2,cam.ppm*0.12);
+  for (let s=4;s<CUR.S_IN-2;s+=7){
+    const p=CUR.inrunPos(s), ty=CUR.bgTerrainY(p.x);
+    if (p.y-1.2<=ty) continue;
+    const x1=wx(p.x), y1=wy(p.y), y2=wy(ty);
+    c.beginPath(); c.moveTo(x1,y1); c.lineTo(x1,y2); c.stroke();
+    const p2=CUR.inrunPos(Math.min(s+7,CUR.S_IN-2));
+    c.beginPath(); c.moveTo(x1,wy(Math.min(p.y-2,ty+(p.y-ty)*0.5)));
+    c.lineTo(wx(p2.x),wy(p2.y)); c.stroke();
+  }
+  c.strokeStyle="#e8eefb"; c.lineWidth=Math.max(3,cam.ppm*0.42);
+  c.beginPath(); c.moveTo(wx(CUR.GATE.x),wy(CUR.GATE.y));
+  for (let i=2;i<CUR.INRUN.length;i+=2) c.lineTo(wx(CUR.INRUN[i].x),wy(CUR.INRUN[i].y));
+  c.stroke();
+  c.strokeStyle="rgba(90,120,170,.8)"; c.lineWidth=1;
+  for (const off of [-0.10,0.10]){
+    c.beginPath();
+    for (let i=0;i<CUR.INRUN.length;i+=2){
+      const P=CUR.INRUN[i], xx=wx(P.x), yy=wy(P.y)+off*cam.ppm;
+      i===0 ? c.moveTo(xx,yy) : c.lineTo(xx,yy);
+    }
+    c.stroke();
+  }
+  c.strokeStyle="#3c5f8c"; c.lineWidth=Math.max(1,cam.ppm*0.1);
+  c.beginPath();
+  for (let i=0;i<CUR.INRUN.length;i+=2){
+    const P=CUR.INRUN[i], xx=wx(P.x), yy=wy(P.y+1.1);
+    i===0 ? c.moveTo(xx,yy) : c.lineTo(xx,yy);
+  }
+  c.stroke();
+  const gb=wx(CUR.GATE.x), gy=wy(CUR.GATE.y);
+  c.fillStyle="#10243f"; c.fillRect(gb-cam.ppm*2.2, gy-cam.ppm*2.6, cam.ppm*2.2, cam.ppm*2.6);
+  c.fillStyle="#d7263d"; c.fillRect(gb-cam.ppm*0.25, gy-cam.ppm*1.15, cam.ppm*0.5, cam.ppm*1.15);
+  c.fillStyle="#6fe3a0"; c.beginPath(); c.arc(gb-cam.ppm*1.1, gy-cam.ppm*2.1, Math.max(1.5,cam.ppm*0.16),0,7); c.fill();
+  const ex=wx(0), ey=wy(0);
+  c.fillStyle="#ffffff"; c.fillRect(ex-cam.ppm*0.9, ey, cam.ppm*0.9, cam.ppm*0.55);
+  c.fillStyle="#d7263d"; c.fillRect(ex-cam.ppm*0.45, ey, cam.ppm*0.45, cam.ppm*0.55);
+}
+function drawTower(){
+  const p=CUR.pointAtDist(CUR.k-13);
+  const bx=wx(p.x+2), byTop=wy(p.y+9), hpx=cam.ppm*7.5, wpx=cam.ppm*3.4;
+  c.fillStyle="#0d1f38"; c.fillRect(bx, byTop, wpx, hpx);
+  c.strokeStyle="#27466e"; c.strokeRect(bx, byTop, wpx, hpx);
+  c.fillStyle="#ffd97a";
+  for (let r=0;r<3;r++) for (let q=0;q<2;q++)
+    c.fillRect(bx+wpx*0.18+q*wpx*0.42, byTop+hpx*0.12+r*hpx*0.26, wpx*0.22, hpx*0.14);
+}
+function drawMasts(){
+  for (const m of CUR.MASTS){
+    const bx=wx(m.x), by=wy(m.y), top=by-13*cam.ppm;
+    if (bx<-80||bx>W+80) continue;
+    c.save(); c.globalCompositeOperation="lighter";
+    const cg=c.createLinearGradient(bx,top,bx,by+5*cam.ppm);
+    cg.addColorStop(0,"rgba(255,232,160,.18)"); cg.addColorStop(1,"rgba(255,232,160,0)");
+    c.fillStyle=cg;
+    c.beginPath(); c.moveTo(bx+cam.ppm*0.3,top);
+    c.lineTo(bx-10*cam.ppm,by+5*cam.ppm); c.lineTo(bx+14*cam.ppm,by+5*cam.ppm);
+    c.closePath(); c.fill();
+    c.restore();
+    c.strokeStyle="#2c4a72"; c.lineWidth=Math.max(2,cam.ppm*0.22);
+    c.beginPath(); c.moveTo(bx,by); c.lineTo(bx,top); c.stroke();
+    c.lineWidth=Math.max(1.5,cam.ppm*0.16);
+    c.beginPath(); c.moveTo(bx-cam.ppm*1.2,top); c.lineTo(bx+cam.ppm*1.2,top); c.stroke();
+    for (const off of [-0.9,0,0.9]){
+      const lx=bx+off*cam.ppm, ly=top+cam.ppm*0.15;
+      c.save(); c.globalCompositeOperation="lighter";
+      const lg=c.createRadialGradient(lx,ly,0.5,lx,ly,cam.ppm*1.6);
+      lg.addColorStop(0,"rgba(255,240,190,.9)"); lg.addColorStop(1,"rgba(255,240,190,0)");
+      c.fillStyle=lg; c.beginPath(); c.arc(lx,ly,cam.ppm*1.6,0,7); c.fill();
+      c.restore();
+      c.fillStyle="#fff3cf"; c.beginPath(); c.arc(lx,ly,Math.max(1.5,cam.ppm*0.22),0,7); c.fill();
+    }
+  }
+}
+function drawCrowd(t){
+  const fs=CUR.LAND[Math.round(CUR.crowdS/DS)] || CUR.LAND_END;
+  const bx=wx(fs.x), by=wy(fs.y);
+  c.fillStyle="#0b1730";
+  c.fillRect(bx, by-3.2*cam.ppm, 48*cam.ppm, 1.9*cam.ppm);
+  c.strokeStyle="#27466e"; c.lineWidth=1;
+  c.strokeRect(bx, by-3.2*cam.ppm, 48*cam.ppm, 1.9*cam.ppm);
+  for (const p of crowd){
+    const cxp=bx+(2+p.o)*cam.ppm, cyp=by-3.2*cam.ppm;
+    const bob=Math.sin(t*3+p.o)*cam.ppm*0.06;
+    c.fillStyle=p.c;
+    c.fillRect(cxp-cam.ppm*0.16, cyp-p.h*cam.ppm*0.55+bob, cam.ppm*0.32, p.h*cam.ppm*0.55);
+    c.fillStyle="#f3c6a0";
+    c.beginPath(); c.arc(cxp, cyp-p.h*cam.ppm*0.55-cam.ppm*0.12+bob, cam.ppm*0.14,0,7); c.fill();
+  }
+  for (let i=0;i<FLAGS.length;i++){
+    const fx=bx+FLAGS[i].o*cam.ppm, fy=by-3.2*cam.ppm;
+    c.strokeStyle="#46689a"; c.lineWidth=Math.max(1,cam.ppm*0.07);
+    c.beginPath(); c.moveTo(fx,fy); c.lineTo(fx,fy-3.4*cam.ppm); c.stroke();
+    const wav=Math.sin(t*4+i)*cam.ppm*0.18;
+    c.fillStyle="#f2f6ff"; c.fillRect(fx,fy-3.4*cam.ppm, 1.5*cam.ppm, 0.45*cam.ppm+wav*0.3);
+    c.fillStyle="#d7263d"; c.fillRect(fx,fy-3.4*cam.ppm+0.45*cam.ppm+wav*0.3, 1.5*cam.ppm, 0.45*cam.ppm);
+  }
+}
+function drawFlakes(t,dt){
+  const mw=W/cam.ppm, mh=H/cam.ppm;
+  c.fillStyle="rgba(235,243,255,.7)";
+  for (const f of FLAKES){
+    f.u += ((-game.wind*0.55)*f.d*dt)/mw;
+    f.v += ((1.1+f.d*1.3)*dt)/mh;
+    f.u=((f.u%1)+1)%1; f.v=((f.v%1)+1)%1;
+    c.globalAlpha=0.25+f.d*0.5;
+    c.beginPath(); c.arc(f.u*W, f.v*H, f.d*1.6,0,7); c.fill();
+  }
+  c.globalAlpha=1;
+}
+
+/* ---------- Springer ---------- */
+const COL={suit:"#d7263d",suitD:"#8c1422",suitL:"#f4604e",bib:"#f7f9ff",
+  skin:"#f3c6a0",helm:"#ffd23f",helmD:"#d7263d",visor:"#15243d",
+  glove:"#22293f",boot:"#1a2336",skiTop:"#ffd23f",skiStripe:"#d7263d",
+  out:"rgba(8,13,26,.92)"};
+function shade(hex,f){ // f<1 dunkler, >1 heller
+  const n=parseInt(hex.slice(1),16);
+  let r=(n>>16)&255,g=(n>>8)&255,b=n&255;
+  r=clamp(Math.round(r*f),0,255); g=clamp(Math.round(g*f),0,255); b=clamp(Math.round(b*f),0,255);
+  return "#"+((1<<24)+(r<<16)+(g<<8)+b).toString(16).slice(1);
+}
+function setSuit(suit,helmet){
+  COL.suit=suit; COL.suitD=shade(suit,0.62); COL.suitL=shade(suit,1.25);
+  COL.helm=helmet; COL.helmD=shade(helmet,0.7);
+}
+function limb(x1,y1,x2,y2,w,col){
+  c.lineCap="round";
+  c.strokeStyle=COL.out; c.lineWidth=w+Math.max(1.6,w*0.42);
+  c.beginPath(); c.moveTo(x1,y1); c.lineTo(x2,y2); c.stroke();
+  c.strokeStyle=col; c.lineWidth=w;
+  c.beginPath(); c.moveTo(x1,y1); c.lineTo(x2,y2); c.stroke();
+}
+function dot(x,y,r,col){
+  c.fillStyle=COL.out; c.beginPath(); c.arc(x,y,r+1.2,0,7); c.fill();
+  c.fillStyle=col; c.beginPath(); c.arc(x,y,r,0,7); c.fill();
+}
+function drawHead(p,x,y){
+  dot(x,y,p*0.165,COL.skin);
+  c.fillStyle=COL.helm;
+  c.beginPath(); c.arc(x-p*0.01,y-p*0.03,p*0.18,Math.PI*0.90,Math.PI*0.10); c.fill();
+  c.fillStyle=COL.helmD;
+  c.beginPath(); c.arc(x-p*0.01,y-p*0.03,p*0.18,Math.PI*1.30,Math.PI*1.70); c.fill();
+  c.fillStyle=COL.visor;
+  c.beginPath(); c.ellipse(x+p*0.10,y-p*0.02,p*0.105,p*0.06,-0.12,0,7); c.fill();
+  c.fillStyle="rgba(255,255,255,.75)";
+  c.fillRect(x+p*0.11,y-p*0.055,p*0.05,p*0.025);
+}
+function drawOneSki(p,xoff,oy,exLen,tilt){
+  c.save(); c.translate(xoff,0); c.rotate(tilt);
+  c.lineCap="round";
+  c.strokeStyle=COL.out; c.lineWidth=Math.max(4.5,p*0.34);
+  c.beginPath(); c.moveTo(-1.05*p,oy); c.lineTo(exLen,oy);
+  c.quadraticCurveTo(exLen+0.30*p,oy,exLen+0.36*p,oy-0.30*p); c.stroke();
+  c.strokeStyle=COL.skiTop; c.lineWidth=Math.max(3,p*0.25);
+  c.beginPath(); c.moveTo(-1.05*p,oy); c.lineTo(exLen,oy);
+  c.quadraticCurveTo(exLen+0.28*p,oy,exLen+0.33*p,oy-0.27*p); c.stroke();
+  c.strokeStyle=COL.skiStripe; c.lineWidth=Math.max(1,p*0.07);
+  c.beginPath(); c.moveTo(-0.92*p,oy); c.lineTo(exLen-0.12*p,oy); c.stroke();
+  dot(exLen+0.33*p,oy-0.27*p,Math.max(1.8,p*0.10),"#ffffff");
+  c.restore();
+}
+function drawSkis(p,ang,spread,stagger){
+  c.save(); c.rotate(ang);
+  drawOneSki(p, -(stagger||0),  0.09*p, 1.60*p,  spread);
+  drawOneSki(p,  (stagger||0), -0.09*p, 1.52*p, -spread);
+  c.fillStyle=COL.out;  c.fillRect(-0.17*p,-0.21*p,0.42*p,0.38*p);
+  c.fillStyle=COL.boot; c.fillRect(-0.14*p,-0.18*p,0.36*p,0.32*p);
+  c.restore();
+}
+function groundShadow(p){
+  c.globalAlpha=0.22; c.fillStyle="#16243f";
+  c.beginPath(); c.ellipse(0.18*p,0.14*p,1.55*p,0.17*p,0,0,7); c.fill();
+  c.globalAlpha=1;
+}
+/* Flugpose: Koerper-Ski-Verhaeltnis aendert sich mit der Fluglage.
+   t=0 -> volle Vorlage (Koerper liegt fast auf den Skiern)
+   t=1 -> aufrecht (grosser Huefte-Winkel, Ski haengen flacher)        */
+function drawBodyFlight(p,t,flareK){
+  const lw=Math.max(3.5,p*0.30), lwT=Math.max(5,p*0.42), lwA=Math.max(3,p*0.23);
+  const L=(a,b)=>lerp(a,b,t);
+  const ankX=L(0.03,0.00),  ankY=L(-0.10,-0.12);
+  const kneX=L(0.32,0.18),  kneY=L(-0.22,-0.36);
+  const hipX=L(0.56,0.36),  hipY=L(-0.33,-0.58);
+  const shoX=L(1.16,0.84),  shoY=L(-0.50,-0.84);
+  const heaX=L(1.32,0.98),  heaY=L(-0.56,-0.93);
+  const elbX=L(0.84,0.58),  elbY=L(-0.36,-0.62);
+  const hanX=L(0.52,0.30),  hanY=L(-0.22,-0.42);
+  const fs=0.26*flareK;                    // Telemark-Schere in der Luft
+  // ferne Seite (Bein nach hinten bei Flare)
+  limb((ankX-0.05-fs)*p,(ankY+0.035)*p,(kneX-0.05-fs*0.5)*p,(kneY+0.035)*p,lw,COL.suitD);
+  limb((kneX-0.05-fs*0.5)*p,(kneY+0.035)*p,(hipX-0.05)*p,(hipY+0.035)*p,lw,COL.suitD);
+  limb((shoX-0.05)*p,(shoY+0.035)*p,(elbX-0.05)*p,(elbY+0.035)*p,lwA,COL.suitD);
+  limb((elbX-0.05)*p,(elbY+0.035)*p,(hanX-0.05)*p,(hanY+0.035)*p,lwA,COL.suitD);
+  dot((hanX-0.05)*p,(hanY+0.035)*p,p*0.072,COL.glove);
+  // nahe Seite (Bein nach vorn bei Flare)
+  limb((ankX+fs)*p,ankY*p,(kneX+fs*0.5)*p,kneY*p,lw,COL.suit);
+  limb((kneX+fs*0.5)*p,kneY*p,hipX*p,hipY*p,lw,COL.suit);
+  limb(hipX*p,hipY*p,shoX*p,shoY*p,lwT,COL.suit);
+  limb((hipX+0.07)*p,(hipY-0.055)*p,(shoX-0.01)*p,(shoY-0.03)*p,lwT*0.42,COL.suitL);
+  dot(((hipX+shoX)/2+0.03)*p,((hipY+shoY)/2-0.02)*p,p*0.10,COL.bib);
+  limb(shoX*p,shoY*p,elbX*p,elbY*p,lwA,COL.suit);
+  limb(elbX*p,elbY*p,hanX*p,hanY*p,lwA,COL.suit);
+  dot(hanX*p,hanY*p,p*0.078,COL.glove);
+  drawHead(p,heaX*p,heaY*p);
+}
+function drawBody(p,pose){
+  const lw=Math.max(3.5,p*0.30), lwT=Math.max(5,p*0.42), lwA=Math.max(3,p*0.23);
+  if (pose==="tuck"){
+    limb(0.00*p,-0.11*p, 0.36*p,-0.35*p, lw, COL.suitD);
+    limb(0.36*p,-0.35*p, -0.02*p,-0.49*p, lw, COL.suitD);
+    limb(0.05*p,-0.13*p, 0.41*p,-0.38*p, lw, COL.suit);
+    limb(0.41*p,-0.38*p, 0.02*p,-0.52*p, lw, COL.suit);
+    limb(0.02*p,-0.52*p, 0.66*p,-0.73*p, lwT, COL.suit);
+    limb(0.10*p,-0.575*p, 0.64*p,-0.755*p, lwT*0.42, COL.suitL);
+    dot(0.46*p,-0.665*p,p*0.09,COL.bib);
+    limb(0.40*p,-0.62*p, 0.92*p,-0.48*p, lwA, COL.suitD);
+    dot(0.93*p,-0.475*p,p*0.07,COL.glove);
+    drawHead(p,0.85*p,-0.82*p);
+  } else if (pose==="telemark"){
+    limb(-0.42*p,-0.12*p, -0.12*p,-0.34*p, lw, COL.suitD);
+    limb(-0.12*p,-0.34*p, 0.28*p,-0.68*p, lw, COL.suitD);
+    limb(0.44*p,-0.12*p, 0.56*p,-0.44*p, lw, COL.suit);
+    limb(0.56*p,-0.44*p, 0.30*p,-0.70*p, lw, COL.suit);
+    limb(0.30*p,-0.70*p, 0.42*p,-1.30*p, lwT, COL.suit);
+    dot(0.38*p,-1.05*p,p*0.095,COL.bib);
+    limb(0.40*p,-1.22*p, 0.95*p,-1.45*p, lwA, COL.suit);
+    limb(0.40*p,-1.22*p, -0.18*p,-1.38*p, lwA, COL.suitD);
+    dot(0.97*p,-1.46*p,p*0.07,COL.glove);
+    dot(-0.20*p,-1.39*p,p*0.07,COL.glove);
+    drawHead(p,0.46*p,-1.52*p);
+  } else { // land2 / Ausfahrt
+    limb(-0.12*p,-0.12*p, -0.04*p,-0.46*p, lw, COL.suitD);
+    limb(0.14*p,-0.12*p, 0.08*p,-0.48*p, lw, COL.suit);
+    limb(0.02*p,-0.47*p, 0.12*p,-1.18*p, lwT, COL.suit);
+    dot(0.10*p,-0.92*p,p*0.095,COL.bib);
+    limb(0.10*p,-1.05*p, 0.58*p,-1.22*p, lwA, COL.suit);
+    limb(0.10*p,-1.05*p, -0.40*p,-1.18*p, lwA, COL.suitD);
+    dot(0.60*p,-1.23*p,p*0.07,COL.glove);
+    dot(-0.42*p,-1.19*p,p*0.07,COL.glove);
+    drawHead(p,0.16*p,-1.40*p);
+  }
+}
+function drawAirflow(){
+  // Strömungslinien entlang der Luft-Relativgeschwindigkeit. Der Winkel zwischen
+  // diesen Linien und den Skiern = Anstellwinkel -> Fluglage direkt am Springer ablesbar.
+  const head=game.wind, wX=-head, wY=(head>=0?head*0.65:head*0.35);
+  const vax=game.vx-wX, vay=game.vy-wY;
+  const va=Math.hypot(vax,vay)||1e-6;
+  const dx=vax/va, dy=-vay/va;            // Reise-Richtung in Screen-Koords
+  const px=-dy, py=dx;                     // senkrecht dazu
+  const cx=wx(game.x), cy=wy(game.y), P=cam.ppm;
+  const len=P*(2.6+va*0.06);
+  const tnow=performance.now()*0.001;
+  c.lineCap="round";
+  const rows=[-1.5,-0.8,0.0,0.9,1.6];
+  for (let i=0;i<rows.length;i++){
+    const o=rows[i]*P*1.15;
+    const base=((tnow*1.6 + i*0.31)%1);    // wandert nach hinten -> Tempo-Gefühl
+    for (let seg=0; seg<2; seg++){
+      const ph=base - seg*0.5; if (ph<0||ph>1) continue;
+      const cxo=cx+px*o - dx*P*1.2, cyo=cy+py*o - dy*P*1.2;
+      const a=0.22*(1-Math.abs(rows[i])/1.8);
+      c.strokeStyle="rgba(196,220,255,"+a.toFixed(2)+")";
+      c.lineWidth=Math.max(1,P*0.10);
+      c.beginPath();
+      c.moveTo(cxo - dx*len*ph,            cyo - dy*len*ph);
+      c.lineTo(cxo - dx*len*(ph+0.32),     cyo - dy*len*(ph+0.32));
+      c.stroke();
+    }
+  }
+}
+function drawJumper(){
+  if (game.state==="menu") return;
+  const flying=(game.pose==="flight");
+  const p=cam.ppm*(flying?1.55:1.35);     // im Flug größer -> Lage besser lesbar
+  if (flying && game.x>1){
+    const gr=CUR.groundAt(game.x), alt=game.y-gr.y;
+    if (alt<28){
+      c.save(); c.translate(wx(game.x),wy(gr.y)); c.rotate(gr.a*D2R);
+      c.globalAlpha=0.26*(1-alt/28); c.fillStyle="#16243f";
+      c.beginPath(); c.ellipse(0,0,p*1.3*(1-alt/60),p*0.17,0,0,7); c.fill();
+      c.restore(); c.globalAlpha=1;
+    }
+    if (game.flightT>0.2) drawAirflow();   // Strömung hinter den Springer
+  }
+  c.save(); c.translate(wx(game.x),wy(game.y));
+  if (game.pose==="crash"){
+    c.rotate(game.spin);
+    drawOneSki(p,-0.15*p,0.30*p,1.25*p,0.45);
+    limb(-0.52*p,0.30*p, 0.12*p,-0.22*p, Math.max(3.5,p*0.30), COL.suit);
+    limb(0.12*p,-0.22*p, 0.56*p,0.12*p, Math.max(3.5,p*0.30), COL.suitD);
+    limb(-0.20*p,-0.45*p, 0.40*p,0.48*p, Math.max(3,p*0.23), COL.suitD);
+    dot(0.58*p,0.13*p,p*0.07,COL.glove);
+    drawHead(p,0.55*p,-0.55*p);
+  } else if (game.pose==="tuck"){
+    c.rotate(CUR.inrunAngle(game.sIn)*D2R);
+    groundShadow(p);
+    drawSkis(p,0,0,0);
+    drawBody(p,"tuck");
+  } else if (game.pose==="flight"){
+    // Dynamische Pose: Lean steuert Huefte-Winkel & Ski-Abstand
+    const tU=clamp((game.B-PHYS.leanMin)/(PHYS.leanMax-PHYS.leanMin),0,1);
+    const settle=clamp(game.flightT/0.5,0,1);    // Uebergang nach dem Absprung
+    const t=lerp(0.9,tU,settle);
+    const flareK=game.flareT>0 ? clamp((game.flightT-game.flareT)/0.18,0,1) : 0;
+    c.rotate(-game.B*D2R);
+    drawSkis(p, lerp(2,32,t)*D2R, 4*D2R, 0.34*p*flareK);
+    drawBodyFlight(p,t,flareK);
+  } else {
+    c.rotate(CUR.groundAt(game.x).a*D2R);
+    groundShadow(p);
+    drawSkis(p,0,0, game.pose==="telemark" ? 0.42*p : 0);
+    drawBody(p, game.pose==="telemark" ? "telemark" : "land2");
+  }
+  c.restore();
+  if (looseSki.on){
+    c.save(); c.translate(wx(looseSki.x),wy(looseSki.y)); c.rotate(looseSki.rot);
+    drawOneSki(p,0,0,1.30*p,0);
+    c.restore();
+  }
+}
+
+/* ---------- HUD im Canvas ---------- */
+function drawHUD(){
+  if (game.state==="inrun" && aidEl.checked){
+    const T=tte();
+    if (T<1.4 || game.tapped){
+      const bw=Math.min(W*0.62,430), bh=16, bx=(W-bw)/2, by=H-58;
+      c.fillStyle="rgba(6,12,26,.85)"; c.fillRect(bx-2,by-2,bw+4,bh+4);
+      c.strokeStyle="#2c5a8f"; c.strokeRect(bx-2,by-2,bw+4,bh+4);
+      const zone=0.20/1.4;
+      c.fillStyle="rgba(111,227,160,.35)";
+      c.fillRect(bx+bw*(1-zone),by,bw*zone,bh);
+      c.fillStyle="#52e08a"; c.fillRect(bx+bw-2,by,2,bh);
+      const f=game.tapped ? game.tapF : clamp(1-T/1.4,0,1);
+      c.fillStyle=game.tapped ? "#ffd23f" : "#e8f0ff";
+      c.fillRect(bx+bw*f-2,by-3,4,bh+6);
+      c.fillStyle="#9db4d8";
+      c.font="600 11px "+getComputedStyle(document.body).getPropertyValue("--mono");
+      c.textAlign="center";
+      c.fillText(game.tapped ? Math.round(game.takeoffQ*100)+" %" : "TIPPEN, WENN DER BALKEN RECHTS IST",
+                 bx+bw/2, by-9);
+      c.textAlign="left";
+    }
+  }
+}
+function render(t,dt){
+  c.clearRect(0,0,W,H);
+  drawSky(t);
+  ridge(0.25, 0.66, 0.16, "#0a1832");
+  ridge(0.45, 0.74, 0.12, "#0c1d3c");
+  drawForest();
+  drawTower();
+  drawSnowBody();
+  drawLightPools();
+  drawMeterLines();
+  drawInrunTower();
+  drawMasts();
+  drawCrowd(t);
+  drawJumper();
+  drawFlakes(t,dt);
+  drawHUD();
+}
+
+/* ====================== DOM ====================== */
+const $=id=>document.getElementById(id);
+const windChip=$("windChip"), speedChip=$("speedChip"),
+      hintEl=$("hint"), toast=$("toast"),
+      menu=$("menu"), result=$("result"),
+      sensEl=$("sens"), aidEl=$("aid"), commEl=$("comm"), sndEl=$("snd");
+let hintUntil=0, toastUntil=0;
+function setHint(t,sec){ if(!t){hintEl.classList.add("hidden");return;}
+  hintEl.textContent=t; hintEl.classList.remove("hidden");
+  hintUntil=performance.now()+sec*1000; }
+function showToast(t,sec){ toast.textContent=t; toast.style.opacity=1;
+  toastUntil=performance.now()+(sec||1.4)*1000; }
+function updateChips(){
+  const w=game.wind, head=w>=0;
+  windChip.innerHTML="WIND "+(head?"◀":"▶")+" "+Math.abs(w).toFixed(1)
+    +' m/s <span class="'+(head?"ok":"warn")+'">'+(head?"AUF":"RÜCK")+"</span>";
+  if (game.state==="inrun"||game.state==="flight"||game.state==="slide"){
+    speedChip.classList.remove("hidden");
+    const v=(game.state==="inrun")?game.v:Math.hypot(game.vx,game.vy);
+    speedChip.textContent=(v*3.6).toFixed(0)+" km/h";
+  } else speedChip.classList.add("hidden");
+  const now=performance.now();
+  if (now>hintUntil) hintEl.classList.add("hidden");
+  if (now>toastUntil) toast.style.opacity=0;
+}
+function switchHill(id){
+  CUR=HILLS[id];
+  $("mTitle").textContent=CUR.name;
+  $("mSub").textContent=CUR.sub;
+  document.querySelectorAll("#hillGrid .segbtn").forEach(b=>
+    b.classList.toggle("active", b.dataset.hill===id));
+}
+// Schanzen-Grid aus dem Roster aufbauen
+(function buildHillGrid(){
+  const grid=$("hillGrid");
+  for (const id of HILL_ORDER){
+    const h=HILL_DEFS[id];
+    const b=document.createElement("button");
+    b.className="segbtn"+(id==="hinzenbach"?" active":"");
+    b.dataset.hill=id;
+    const shortName=h.name.split(" · ")[0];
+    b.innerHTML="<b>"+shortName+"</b><small>HS"+h.hs+" · K"+h.k+"</small>";
+    b.addEventListener("click",e=>{ e.stopPropagation(); switchHill(id); });
+    grid.appendChild(b);
+  }
+})();
+// Steuerungswahl Touch / Gyro
+let controlMode="touch";
+document.querySelectorAll("#ctrlSeg .segbtn").forEach(b=>{
+  b.addEventListener("click",async e=>{
+    e.stopPropagation();
+    const mode=b.dataset.ctrl;
+    if (mode==="gyro"){
+      const ok=await Gyro.enable();
+      if (!ok){ setHint("Neigungssensor nicht verfügbar – bleibe bei Touch.",2.5); return; }
+    }
+    controlMode=mode;
+    document.querySelectorAll("#ctrlSeg .segbtn").forEach(x=>
+      x.classList.toggle("active", x.dataset.ctrl===mode));
+  });
+});
+
+/* ====================== Sprung-Lebenszyklus ====================== */
+function resetCommon(){
+  Object.assign(game,{state:"inrun",sIn:0,v:0,B:30,pose:"tuck",spin:0,
+    tookOff:false,tapped:false,takeoffQ:0,takeoffSpeed:0,tapF:0,
+    flareT:-99,flightT:0,diveT:0,ftick:0,wobble:0,lastB:30,score:null,
+    saidK:false,saidHS:false,saidFlight:false,crashed:false,landType:"",dist:0,vPerp:0});
+  looseSki.on=false;
+  const p=CUR.inrunPos(0); game.x=p.x; game.y=p.y;
+  menu.classList.add("hidden"); result.classList.add("hidden");
+}
+function newJump(){
+  replay=null; career.inEvent=false; career.mod=null;
+  setSuit("#d7263d","#ffd23f");
+  game.jumpNo++;
+  // Im Bewerb: pro Durchgang gleicher Seed -> alle Springer bekommen denselben Wind (fair)
+  if (comp.active){
+    game.rng=mulberry32(comp.seedBase + comp.round*100003 + 17);
+  } else {
+    game.rng=mulberry32(1000+game.jumpNo*7919);
+  }
+  rollWind();
+  resetCommon();
+  game.rec={ hill:CUR.id, seed:game.jumpNo, windBase:game.windBase,
+             takeoffQ:0, flareTick:-1, leans:[] };
+  Gyro.calibrate();
+  if (comp.active){
+    const pl=comp.players[comp.idx];
+    setHint("Durchgang "+(comp.round+1)+"/"+comp.rounds+" · "+pl.name+" – an der Kante tippen!",4);
+  } else {
+    setHint(controlMode==="gyro"?"Gerät neigen für die Fluglage – an der Kante tippen!":
+            "Warte … und tippe GENAU an der Tischkante!",4);
+  }
+  Andi.say("start",{prio:true,force:true});
+  Snd.gate();
+}
+function startReplay(data){
+  if (!data) return;
+  replay=data; game.rec=null;
+  CUR=HILLS[data.hill]||CUR;
+  game.rng=mulberry32(data.seed); game.windBase=data.windBase;
+  game.windTarget=game.windBase; game.wind=game.windBase;
+  resetCommon();
+  setHint("▶ Replay",2.0);
+  Snd.gate();
+}
+function takeoffTap(){
+  if (game.tapped) return;
+  const T=tte();
+  if (T>PHYS.tapAccept){
+    setHint("Noch zu früh! Erst direkt an der Kante tippen.",1.4);
+    return;
+  }
+  game.tapped=true;
+  game.tapF=clamp(1-T/1.4,0,1);
+  game.takeoffQ = 0.15+0.85*Math.exp(-Math.pow(T/0.18,2));
+}
+function flare(){
+  if (replay) return;                       // im Replay nicht per Eingabe
+  if (game.state!=="flight" || game.flightT<0.35) return;
+  if (game.flareT>0) return;
+  game.flareT=game.flightT;
+  if (game.rec) game.rec.flareTick=game.ftick;
+}
+function finishJump(){
+  game.state="result";
+  const bid=CUR.id;
+  const sc=scoreJump(); game.score=sc;
+  const isRecord = !game.crashed && game.dist>(bests[bid]||0);
+  if (isRecord) bests[bid]=game.dist;
+  const isBestScore = sc.total>(bestScores[bid]||0);
+  if (isBestScore) bestScores[bid]=sc.total;
+  // Replay des Sprungs sichern (nur bei echtem Sprung, nicht bei Replay-Wiedergabe)
+  if (game.rec){ game.rec.flareTick = game.rec.flareTick==null?-1:game.rec.flareTick;
+    replays[bid]=game.rec; }
+  if (isRecord && game.jumpNo>1 && !replay){ setTimeout(()=>Andi.say("record",{prio:true,force:true}),700);
+    setTimeout(()=>Snd.cheer(true),650); }
+  $("rEye").textContent=(replay?"▶ Replay · ":"")+CUR.name+" · Sprungrichtertafel";
+  $("rDist").textContent=game.dist.toFixed(1);
+  $("rPoints").textContent=game.crashed?"– Pkt":sc.total.toFixed(1)+" Pkt";
+  // Richternoten anzeigen, höchste/niedrigste markiert
+  const sorted=[...sc.judges].sort((a,b)=>a-b);
+  const hi=sorted[4], lo=sorted[0]; let usedLo=false,usedHi=false;
+  $("rJudges").innerHTML = sc.judges.map(j=>{
+    let strike=false;
+    if (!usedLo && j===lo){ usedLo=true; strike=true; }
+    else if (!usedHi && j===hi){ usedHi=true; strike=true; }
+    return '<span class="judge'+(strike?' strike':'')+'">'+j.toFixed(1)+'</span>';
+  }).join("");
+  $("rScoreLine").innerHTML="Weite <b>"+sc.distPts.toFixed(1)+"</b> + Haltung <b>"+sc.stylePts.toFixed(1)+"</b>";
+  const q=game.takeoffQ;
+  const qLab=q>0.9?"Perfekt":q>0.7?"Stark":q>0.45?"Okay":q>0.2?"Zu früh":"Verschlafen";
+  $("rTake").textContent=Math.round(q*100)+" % · "+qLab;
+  $("rSpeed").textContent=(game.takeoffSpeed*3.6).toFixed(1)+" km/h";
+  const head=game.windBase>=0;
+  $("rWind").innerHTML=(head?"◀ ":"▶ ")+Math.abs(game.windBase).toFixed(1)
+    +" m/s "+(head?'<span class="ok">Aufwind</span>':'<span class="warn">Rückenwind</span>');
+  $("rLand").innerHTML=game.crashed?('<span class="warn">'+game.landType+'</span>')
+    :(game.landType==="Telemark!"?'<span class="ok">Telemark!</span>':game.landType);
+  $("rBest").textContent=(bests[bid]?bests[bid].toFixed(1)+" m":"–")
+    +(bestScores[bid]?" · "+bestScores[bid].toFixed(1)+" Pkt":"");
+  let head2;
+  if (game.crashed) head2="Sturz bei "+game.dist.toFixed(1)+" m";
+  else if (game.dist>=CUR.hs) head2="ÜBER HILLSIZE! Schanzen-Wahnsinn!";
+  else if (game.dist>=CUR.k) head2="Über den K-Punkt – starker Sprung!";
+  else if (game.dist>=CUR.k*0.88) head2="Solide – der K-Punkt wartet bei "+CUR.k+" m.";
+  else head2="Da geht mehr: Timing &amp; Vorlage üben.";
+  $("rHead").innerHTML=head2;
+  $("replayBtn").style.display = replays[bid] ? "block" : "none";
+  // ---- Karriere-Bewerb: eigener Sprung ----
+  if (career.inEvent && !replay){
+    finishCareerJump();
+    renderCareerInline();
+  } else if (comp.active && !replay){
+    const pl=comp.players[comp.idx];
+    pl.scores.push(game.crashed? clamp(sc.distPts*0.3,0,40) : sc.total);
+    pl.dists.push(game.dist);
+    if (comp.mode==="net" && pl.id===comp.myId && Net.ready)
+      Net.send({t:"jump", id:comp.myId, round:comp.round, score:pl.scores[pl.scores.length-1], dist:game.dist});
+    const last=(comp.idx>=comp.players.length-1 && comp.round>=comp.rounds-1);
+    $("again").textContent = last ? "Siegerehrung" : "Weiter";
+    renderStandingsInline();
+  } else {
+    $("again").textContent = "Nächster Sprung";
+  }
+  result.classList.remove("hidden");
+}
+function renderCareerInline(){
+  const ps=career.eventScores.player;
+  $("rScoreLine").innerHTML += '<br><span style="color:var(--dim)">Bewerb gesamt: '+ps.tot.toFixed(1)+' Pkt</span>';
+}
+
+/* ====================== Bewerbs-Ablauf & Standings ====================== */
+function startCompetition(){
+  comp.active=true;
+  comp.round=0; comp.idx=0;
+  comp.hill=CUR.id;
+  if (comp.mode!=="net") comp.seedBase=(Math.random()*1e9)|0;
+  for (const p of comp.players){ p.scores=[]; p.dists=[]; }
+  menu.classList.add("hidden");
+  newJump();
+}
+function renderStandingsInline(){
+  const rows=compSorted();
+  const txt=rows.map((e,i)=>(i+1)+". "+e.p.name+" "+e.tot.toFixed(0)).join("  ·  ");
+  $("rScoreLine").innerHTML += '<br><span style="color:var(--dim)">Stand: '+txt+'</span>';
+}
+function compAdvance(){
+  result.classList.add("hidden");
+  comp.idx++;
+  if (comp.idx>=comp.players.length){ comp.idx=0; comp.round++; }
+  if (comp.round>=comp.rounds){ showFinalStandings(); return; }
+  if (comp.mode==="net"){
+    const pl=comp.players[comp.idx];
+    if (pl.id!==comp.myId){ waitForRemote(); return; }
+  }
+  newJump();
+  if (comp.mode==="local"){
+    const pl=comp.players[comp.idx];
+    setHint("➡ Gerät an "+pl.name+" weitergeben – dann an der Kante tippen!",4);
+  }
+}
+function waitForRemote(){
+  result.classList.add("hidden");
+  setHint("Warte auf "+comp.players[comp.idx].name+" …",6);
+  // Anzeige bleibt im "menu-frei"-Zustand; Net.onJump triggert Fortschritt
+  game.state="result";
+}
+function showFinalStandings(){
+  comp.active=false;
+  const sorted=compSorted();
+  $("stTitle").textContent= sorted.length? "🏆 "+sorted[0].p.name : "SIEGEREHRUNG";
+  $("stEye").textContent= HILL_DEFS[comp.hill].name+" · Endstand";
+  $("stList").innerHTML = sorted.map((e,i)=>{
+    const medal=["🥇","🥈","🥉"][i]||(i+1+".");
+    const me=(comp.mode==="net" && e.p.id===comp.myId)?" me":"";
+    const lead=i===0?" lead":"";
+    return '<div class="r'+me+lead+'"><span><span class="rank">'+medal+'</span>'+e.p.name+'</span>'
+      +'<b>'+e.tot.toFixed(1)+' Pkt · '+e.best.toFixed(1)+' m</b></div>';
+  }).join("");
+  result.classList.add("hidden");
+  $("standings").classList.remove("hidden");
+  if (sorted.length){ Andi.say("record",{prio:true,force:true}); Snd.cheer(true); }
+}
+
+/* ====================== Persistenz (IndexedDB, mit Fallback) ====================== */
+const Store = {
+  db:null, mem:{},
+  open(){ return new Promise(res=>{
+    try{
+      const rq=indexedDB.open("skiflug-ooe",1);
+      rq.onupgradeneeded=()=>rq.result.createObjectStore("kv");
+      rq.onsuccess=()=>{ this.db=rq.result; res(true); };
+      rq.onerror=()=>res(false);
+    }catch(e){ res(false); }
+  });},
+  get(k){ return new Promise(res=>{
+    if (!this.db){ res(this.mem[k]); return; }
+    try{ const t=this.db.transaction("kv","readonly").objectStore("kv").get(k);
+      t.onsuccess=()=>res(t.result); t.onerror=()=>res(undefined);
+    }catch(e){ res(this.mem[k]); }
+  });},
+  set(k,v){ this.mem[k]=v;
+    if (!this.db) return;
+    try{ this.db.transaction("kv","readwrite").objectStore("kv").put(v,k); }catch(e){}
+  }
+};
+function snapshot(){
+  return { v:3, bests, bestScores,
+    settings:{ sens:sensEl.value, snd:sndEl.checked, comm:commEl.checked, aid:aidEl.checked, controlMode },
+    replays };
+}
+function saveState(){ Store.set("state", snapshot()); }
+async function loadState(){
+  await Store.open();
+  try{ if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); }catch(e){}
+  const s=await Store.get("state");
+  if (!s) return;
+  Object.assign(bests, s.bests||{}); Object.assign(bestScores, s.bestScores||{});
+  Object.assign(replays, s.replays||{});
+  const st=s.settings||{};
+  if (st.sens){ sensEl.value=st.sens; $("sensVal").textContent=st.sens; }
+  if ("snd" in st){ sndEl.checked=st.snd; Snd.on=st.snd; }
+  if ("comm" in st){ commEl.checked=st.comm; Andi.on=st.comm; }
+  if ("aid" in st){ aidEl.checked=st.aid; }
+  if (st.controlMode) controlMode=st.controlMode;
+}
+function exportSave(){
+  const blob=new Blob([JSON.stringify(snapshot(),null,1)],{type:"application/json"});
+  const a=document.createElement("a"); a.href=URL.createObjectURL(blob);
+  a.download="skiflug-ooe-save.json"; a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),2000);
+}
+function importSave(file){
+  const r=new FileReader();
+  r.onload=()=>{ try{ const s=JSON.parse(r.result);
+    Object.assign(bests,s.bests||{}); Object.assign(bestScores,s.bestScores||{});
+    Object.assign(replays,s.replays||{}); saveState();
+    setHint("Spielstand geladen!",2.5);
+  }catch(e){ setHint("Datei konnte nicht gelesen werden.",2.5);} };
+  r.readAsText(file);
+}
+
+/* ====================== PWA: Service Worker + Install ====================== */
+let deferredPrompt=null;
+if ("serviceWorker" in navigator){
+  window.addEventListener("load",()=>{
+    navigator.serviceWorker.register("sw.js").catch(()=>{}); // im Preview evtl. blockiert
+  });
+}
+window.addEventListener("beforeinstallprompt",e=>{
+  e.preventDefault(); deferredPrompt=e; $("installBtn").classList.remove("hidden");
+});
+$("installBtn").addEventListener("click",async e=>{
+  e.stopPropagation();
+  if (!deferredPrompt) return;
+  deferredPrompt.prompt(); await deferredPrompt.userChoice;
+  deferredPrompt=null; $("installBtn").classList.add("hidden");
+});
+
+/* ====================== WLAN-Mehrspieler (WebRTC, serverlos) ======================
+   Turn-basiert: jedes Gerät springt selbst, Ergebnisse werden über den Data-Channel
+   geteilt. Signalisierung per Hand (Code kopieren). 1:1 (Host + Gast).             */
+const Net = {
+  pc:null, ch:null, ready:false, isHost:false, onJump:null,
+  enc(o){ return btoa(unescape(encodeURIComponent(JSON.stringify(o)))); },
+  dec(s){ return JSON.parse(decodeURIComponent(escape(atob(s.trim())))); },
+  cfg:{ iceServers:[{urls:"stun:stun.l.google.com:19302"}] },
+  reset(){ try{this.ch&&this.ch.close();this.pc&&this.pc.close();}catch(e){} this.pc=null;this.ch=null;this.ready=false; },
+  async waitIce(){ return new Promise(res=>{
+    if (this.pc.iceGatheringState==="complete") return res();
+    const chk=()=>{ if (this.pc.iceGatheringState==="complete"){ this.pc.removeEventListener("icegatheringstatechange",chk); res(); } };
+    this.pc.addEventListener("icegatheringstatechange",chk);
+    setTimeout(res,2500); // Fallback
+  });},
+  setupChannel(ch){
+    this.ch=ch;
+    ch.onopen=()=>{ this.ready=true; netStatus("Verbunden!","ok");
+      this.send({t:"hello", name:myPlayerName()}); };
+    ch.onclose=()=>{ this.ready=false; netStatus("Verbindung getrennt.","err"); };
+    ch.onmessage=e=>{ try{ this.recv(JSON.parse(e.data)); }catch(_){} };
+  },
+  async createOffer(){
+    this.reset(); this.isHost=true;
+    this.pc=new RTCPeerConnection(this.cfg);
+    this.setupChannel(this.pc.createDataChannel("skiflug"));
+    const o=await this.pc.createOffer(); await this.pc.setLocalDescription(o);
+    await this.waitIce();
+    return this.enc(this.pc.localDescription);
+  },
+  async acceptAnswer(code){
+    await this.pc.setRemoteDescription(this.dec(code));
+  },
+  async makeAnswer(offerCode){
+    this.reset(); this.isHost=false;
+    this.pc=new RTCPeerConnection(this.cfg);
+    this.pc.ondatachannel=e=>this.setupChannel(e.channel);
+    await this.pc.setRemoteDescription(this.dec(offerCode));
+    const a=await this.pc.createAnswer(); await this.pc.setLocalDescription(a);
+    await this.waitIce();
+    return this.enc(this.pc.localDescription);
+  },
+  send(o){ if (this.ready) try{ this.ch.send(JSON.stringify(o)); }catch(e){} },
+  recv(m){
+    if (m.t==="hello") netGotPeer(m.name);
+    else if (m.t==="config") netGotConfig(m);
+    else if (m.t==="jump") netGotJump(m);
+  }
+};
+function myPlayerName(){ return netMyName; }
+let netMyName="";
+
+/* ====================== Menü-Logik: Modi & Bewerb-Setup ====================== */
+function rebuildPlayerNames(){
+  const n=Number(document.querySelector("#plSeg .segbtn.active")?.dataset.pl||2);
+  $("plCountVal").textContent=n;
+  const wrap=$("plNames"); wrap.innerHTML="";
+  for (let i=0;i<n;i++){
+    const row=document.createElement("div"); row.className="pl";
+    const inp=document.createElement("input"); inp.value=OOE.randName(); inp.dataset.i=i;
+    const dice=document.createElement("button"); dice.className="dice"; dice.textContent="🎲";
+    dice.addEventListener("click",e=>{ e.stopPropagation(); inp.value=OOE.randName(); });
+    row.appendChild(inp); row.appendChild(dice); wrap.appendChild(row);
+  }
+}
+function setMode(mode){
+  comp.mode=mode;
+  document.querySelectorAll("#modeSeg .segbtn").forEach(b=>
+    b.classList.toggle("active", b.dataset.mode===mode));
+  $("compSetup").classList.toggle("hidden", mode!=="local");
+  $("startBtn").classList.toggle("hidden", mode==="net"||mode==="career");
+  if (mode==="local" && $("plNames").children.length===0) rebuildPlayerNames();
+  if (mode==="net"){ menu.classList.add("hidden"); $("netMenu").classList.remove("hidden"); netInit(); }
+  if (mode==="career"){ menu.classList.add("hidden"); openCareerEntry(); }
+}
+
+/* ====================== KARRIERE: UI & Ablauf ====================== */
+function hideAllBoards(){ ["menu","result","standings","netMenu","careerCreate",
+  "careerHub","careerTrain","careerEventRes","careerSeasonEnd"].forEach(id=>$(id).classList.add("hidden")); }
+function attrBar(k,val){ return '<div class="attrrow"><span class="nm">'+ATTR_NAMES[k]+
+  '</span><div class="bar"><i style="width:'+(val*10)+'%"></i></div><span class="val">'+val+'</span></div>'; }
+
+// Einstieg: gespeicherte Karriere fortsetzen oder neu erstellen
+async function openCareerEntry(){
+  const saved=await Store.get("career");
+  if (saved && saved.player){ career.active=true;
+    Object.assign(career,saved);
+    if (!career.stats) career.stats={wins:0,podiums:0,starts:0,titles:0,bestJump:0,careerPts:0,trained:0,seasons:0,sWins:0,sPodiums:0,sStarts:0};
+    if (career._trainedAt==null) career._trainedAt=-1;
+    openCareerHub(); }
+  else openCareerCreate();
+}
+// ---- Springer erstellen ----
+let ccDraft=null;
+function openCareerCreate(){
+  hideAllBoards();
+  ccDraft={ name:OOE.randName(), home:OOE.randOrt(),
+    colors:{suit:SUITS[0],helmet:HELMETS[0]},
+    attrs:{power:5,flight:5,stability:5,telemark:5,nerves:5}, pool:10 };
+  $("ccName").value=ccDraft.name;
+  $("ccHome").textContent="aus "+ccDraft.home+" (OÖ)";
+  // Farb-Swatches
+  const cr=$("ccColors"); cr.innerHTML="";
+  const mkCol=(label,arr,key)=>{
+    const col=document.createElement("div"); col.className="swcol";
+    col.innerHTML='<span class="lbl">'+label+'</span>';
+    arr.forEach(c=>{ const s=document.createElement("div");
+      s.className="sw"+(ccDraft.colors[key]===c?" sel":""); s.style.background=c;
+      s.addEventListener("click",e=>{ e.stopPropagation(); ccDraft.colors[key]=c;
+        cr.querySelectorAll(".swcol").length; openCareerCreate.repaintColors(); });
+      col.appendChild(s); });
+    cr.appendChild(col);
+  };
+  openCareerCreate.repaintColors=()=>{
+    cr.innerHTML=""; mkCol("Anzug",SUITS,"suit"); mkCol("Helm",HELMETS,"helmet");
+  };
+  openCareerCreate.repaintColors();
+  renderCcAttrs();
+  $("careerCreate").classList.remove("hidden");
+}
+function renderCcAttrs(){
+  $("ccPool").textContent=ccDraft.pool;
+  const box=$("ccAttrs"); box.innerHTML="";
+  for(const k of ATTR_KEYS){
+    const row=document.createElement("div"); row.className="attrrow";
+    row.innerHTML='<span class="nm">'+ATTR_NAMES[k]+'</span>'+
+      '<div class="bar"><i style="width:'+(ccDraft.attrs[k]*10)+'%"></i></div>'+
+      '<span class="val">'+ccDraft.attrs[k]+'</span>';
+    const minus=document.createElement("button"); minus.textContent="−";
+    const plus=document.createElement("button"); plus.textContent="+";
+    minus.addEventListener("click",e=>{ e.stopPropagation();
+      if(ccDraft.attrs[k]>1){ ccDraft.attrs[k]--; ccDraft.pool++; renderCcAttrs(); } });
+    plus.addEventListener("click",e=>{ e.stopPropagation();
+      if(ccDraft.pool>0 && ccDraft.attrs[k]<10){ ccDraft.attrs[k]++; ccDraft.pool--; renderCcAttrs(); } });
+    row.appendChild(minus); row.appendChild(plus); box.appendChild(row);
+  }
+}
+function startCareer(){
+  const rng=mulberry32((Math.random()*1e9)|0);
+  career.active=true; career.season=1; career.eventIdx=0;
+  career.seedBase=(Math.random()*1e9)|0;
+  career.player={ id:"player", name:$("ccName").value.trim()||ccDraft.name, nation:"AUT",
+    home:ccDraft.home, colors:{...ccDraft.colors}, attrs:{...ccDraft.attrs}, age:18, form:0.5, ai:false };
+  career.world=genWorld(rng, 48);
+  career.calendar=makeCalendar(1);
+  career.wc={};
+  career.stats={wins:0,podiums:0,starts:0,titles:0,bestJump:0,careerPts:0,trained:0,seasons:0,sWins:0,sPodiums:0,sStarts:0};
+  career.lastResult=null; career._trainedAt=-1;
+  saveCareer();
+  openCareerHub();
+}
+// ---- Hub ----
+function openCareerHub(){
+  hideAllBoards();
+  const p=career.player;
+  $("chSeason").textContent="Saison "+career.season+" · "+p.home;
+  $("chName").textContent=p.name.toUpperCase();
+  $("chMeta").textContent=p.age+" Jahre · Form "+formLabel(p.form)+" · Bewerb "
+    +(career.eventIdx)+"/"+career.calendar.length;
+  $("chAttrs").innerHTML=ATTR_KEYS.map(k=>attrBar(k,p.attrs[k])).join("");
+  // Karriere-Statistik + letztes Ergebnis
+  const st=career.stats;
+  let line='<span style="color:var(--accent)">'+st.wins+'</span> Siege · '
+    +'<span style="color:var(--accent)">'+st.podiums+'</span> Podeste · '
+    +st.starts+' Starts';
+  if (st.titles>0) line='🏆 '+st.titles+' Gesamt-WC · '+line;
+  if (st.bestJump>0) line+=' · weitester '+st.bestJump.toFixed(1)+' m';
+  $("chStats").innerHTML=line;
+  if (career.lastResult){ const lr=career.lastResult;
+    $("chLast").innerHTML='Zuletzt '+lr.hill+': <b>Platz '+lr.place+'</b> (+'+lr.gained+' WC, '+lr.dist.toFixed(1)+' m)';
+    $("chLast").style.display="block";
+  } else $("chLast").style.display="none";
+  // nächster Bewerb
+  const ev=career.calendar[career.eventIdx];
+  if (ev){
+    const h=HILL_DEFS[ev.hillId];
+    const tag = ev.final?'<span class="typ">Skiflug-Finale</span>'
+      : ev.tournee?'<span class="typ">OÖ-Tournee '+ev.tourneeNr+'/4</span>'
+      : '<span class="typ">Weltcup</span>';
+    $("chNext").innerHTML="<b>"+h.name.split(" · ")[0]+"</b> · HS"+h.hs+" · "+ev.rounds+" Durchgänge"+tag;
+    $("chJumpBtn").style.display="block";
+  } else {
+    $("chNext").innerHTML="<b>Saison beendet</b> – Zeit für die Siegerehrung!";
+    $("chJumpBtn").style.display="none";
+  }
+  // WC-Stand top 6
+  const wc=wcSorted().slice(0,6);
+  $("chWC").innerHTML=wc.map((e,i)=>{
+    const me=e.j.id==="player"?" me":""; const lead=i===0?" lead":"";
+    return '<div class="r'+me+lead+'"><span><span class="rank">'+(i+1)+'.</span>'+e.j.name+'</span><b>'+e.pts+'</b></div>';
+  }).join("");
+  if (!ev) $("chJumpBtn").style.display="none";
+  $("careerHub").classList.remove("hidden");
+}
+// ---- Bewerb starten (Spieler springt selbst) ----
+function startCareerEvent(){
+  const ev=career.calendar[career.eventIdx]; if(!ev) return;
+  career.inEvent=true; career.eventRound=0;
+  career.eventScores={}; career.eventScores.player={tot:0,best:0,jumps:[]};
+  CUR=HILLS[ev.hillId];
+  setSuit(career.player.colors.suit, career.player.colors.helmet);
+  // Tagesform leicht würfeln
+  career.player.form=clamp(career.player.form+(Math.random()*0.3-0.15),0.2,1);
+  career.mod=playerMods();
+  hideAllBoards();
+  careerNewJump();
+}
+function careerNewJump(){
+  comp.active=false; replay=null;
+  game.jumpNo++;
+  game.rng=mulberry32(career.seedBase + career.eventIdx*7919 + career.eventRound*131 + 5);
+  rollWind(); resetCommon();
+  game.rec={ hill:CUR.id, seed:game.jumpNo, windBase:game.windBase, takeoffQ:0, flareTick:-1, leans:[] };
+  Gyro.calibrate();
+  const ev=career.calendar[career.eventIdx];
+  setHint("Durchgang "+(career.eventRound+1)+"/"+ev.rounds+" · "+career.player.name+" – an der Kante tippen!",4);
+  Andi.say("start",{prio:true,force:true}); Snd.gate();
+}
+function finishCareerJump(){
+  // wird aus finishJump() gerufen, nachdem game.score gesetzt ist
+  const sc=game.score;
+  const pts=game.crashed? clamp(sc.distPts*0.3,0,40)+sc.stylePts : sc.total;
+  const ps=career.eventScores.player;
+  ps.tot+=pts; ps.best=Math.max(ps.best,game.dist); ps.jumps.push({pts,dist:game.dist});
+  const ev=career.calendar[career.eventIdx];
+  $("again").textContent = (career.eventRound>=ev.rounds-1)?"Bewerb auswerten":"Nächster Durchgang";
+}
+function careerAfterJump(){
+  saveCareer();
+  const ev=career.calendar[career.eventIdx];
+  career.eventRound++;
+  result.classList.add("hidden");
+  if (career.eventRound<ev.rounds){ careerNewJump(); return; }
+  // alle Durchgänge gesprungen -> KI simulieren & Bewerb auswerten
+  evaluateCareerEvent();
+}
+function evaluateCareerEvent(){
+  const ev=career.calendar[career.eventIdx]; const hill=HILL_DEFS[ev.hillId];
+  const rng=mulberry32(career.seedBase + career.eventIdx*99991 + 7);
+  // KI-Tagesform
+  for(const j of career.world) j.form=clamp(0.5+(rng()*0.5-0.25),0.15,1);
+  const field=[];
+  field.push({id:"player", name:career.player.name, tot:career.eventScores.player.tot,
+    best:career.eventScores.player.best, me:true});
+  for(const j of career.world){
+    let tot=0,best=0;
+    for(let r=0;r<ev.rounds;r++){ const res=aiJump(rng,hill,j); tot+=res.total; best=Math.max(best,res.dist); }
+    field.push({id:j.id,name:j.name,tot,best,me:false});
+  }
+  field.sort((a,b)=>b.tot-a.tot);
+  awardWC(field);
+  // Ergebnis-Screen
+  const place=field.findIndex(f=>f.id==="player")+1;
+  const gained=place<=30?WC_POINTS[place-1]:0;
+  // ---- Karriere-Statistik ----
+  const st=career.stats;
+  st.starts++; st.sStarts++; st.careerPts+=gained;
+  if (place===1){ st.wins++; st.sWins++; }
+  if (place<=3){ st.podiums++; st.sPodiums++; }
+  st.bestJump=Math.max(st.bestJump, career.eventScores.player.best);
+  career.lastResult={ hill:hill.name.split(" · ")[0], place, gained,
+    dist:career.eventScores.player.best, tournee:!!ev.tournee, final:!!ev.final };
+  hideAllBoards();
+  $("ceEye").textContent=hill.name.split(" · ")[0]+" · "+(ev.final?"Skiflug-Finale":ev.tournee?"OÖ-Tournee":"Weltcup");
+  $("ceTitle").textContent= place===1?"🥇 SIEG!":place<=3?"🏆 PODEST!":"Platz "+place;
+  $("cePlace").textContent=place+".";
+  $("cePts").textContent="+"+gained+" WC";
+  $("ceList").innerHTML=field.slice(0,8).map((f,i)=>{
+    const me=f.me?" me":""; const lead=i===0?" lead":"";
+    return '<div class="r'+me+lead+'"><span><span class="rank">'+(i+1)+'.</span>'+f.name+'</span><b>'+f.tot.toFixed(1)+' · '+f.best.toFixed(1)+'m</b></div>';
+  }).join("") + (place>8?'<div class="r me"><span><span class="rank">'+place+'.</span>'+career.player.name+'</span><b>'+career.eventScores.player.tot.toFixed(1)+'</b></div>':'');
+  career.inEvent=false; career.mod=null;
+  career.eventIdx++;
+  // Form erholt sich leicht zwischen Bewerben
+  career.player.form=clamp(career.player.form+0.06,0.15,1);
+  saveCareer();
+  if (place===1){ Andi.say("record",{prio:true,force:true}); Snd.cheer(true); }
+  $("careerEventRes").classList.remove("hidden");
+}
+function afterCareerEvent(){
+  if (career.eventIdx>=career.calendar.length) openSeasonEnd();
+  else openCareerHub();
+}
+// ---- Training ----
+function formLabel(f){ const p=Math.round(f*100);
+  return p+"% "+(p>=80?"🔥 top":p>=55?"👍 gut":p>=35?"😐 mittel":"😩 schwach"); }
+function openTraining(){
+  hideAllBoards();
+  // Trainingspunkte einmal pro Bewerb; gemerkt über eventIdx
+  if (career._trainedAt!==career.eventIdx){ career._trainPool=3; career._trainedAt=career.eventIdx; }
+  renderTrainAttrs();
+  $("careerTrain").classList.remove("hidden");
+}
+function renderTrainAttrs(){
+  $("ctPool").textContent=career._trainPool;
+  $("ctForm").textContent=formLabel(career.player.form);
+  const box=$("ctAttrs"); box.innerHTML="";
+  for(const k of ATTR_KEYS){
+    const row=document.createElement("div"); row.className="attrrow";
+    row.innerHTML='<span class="nm">'+ATTR_NAMES[k]+'</span>'+
+      '<div class="bar"><i style="width:'+(career.player.attrs[k]*10)+'%"></i></div>'+
+      '<span class="val">'+career.player.attrs[k]+'</span>';
+    const plus=document.createElement("button"); plus.textContent="+";
+    plus.addEventListener("click",e=>{ e.stopPropagation();
+      if(career._trainPool>0 && career.player.attrs[k]<10){
+        career.player.attrs[k]++; career._trainPool--;
+        career.player.form=clamp(career.player.form-0.05,0.15,1); // Übertraining kostet Form
+        career.stats.trained=(career.stats.trained||0)+1;
+        renderTrainAttrs(); } });
+    row.appendChild(plus); box.appendChild(row);
+  }
+}
+function restDay(){
+  career.player.form=clamp(career.player.form+0.12,0.15,1);
+  setHint("Erholt! Form jetzt "+Math.round(career.player.form*100)+"%",2);
+  renderTrainAttrs();
+}
+// ---- Saisonende ----
+function openSeasonEnd(){
+  hideAllBoards();
+  const final=wcSorted();
+  const myPlace=final.findIndex(e=>e.j.id==="player")+1;
+  if (myPlace===1) career.stats.titles++;
+  career.stats.seasons++;
+  $("seEye").textContent="Saison "+career.season+" · Abschluss";
+  $("seTitle").textContent= myPlace===1?"🏆 GESAMTWELTCUP-SIEGER!":"Gesamt-Platz "+myPlace;
+  const st=career.stats;
+  $("seSub").innerHTML="Saison-Bilanz: <b>"+st.sWins+"</b> Siege, <b>"+st.sPodiums
+    +"</b> Podeste in "+st.sStarts+" Starts.<br>Gesamtweltcup-Endstand:";
+  $("seList").innerHTML=final.slice(0,8).map((e,i)=>{
+    const me=e.j.id==="player"?" me":""; const lead=i===0?" lead":"";
+    return '<div class="r'+me+lead+'"><span><span class="rank">'+(i+1)+'.</span>'+e.j.name+'</span><b>'+e.pts+'</b></div>';
+  }).join("");
+  $("careerSeasonEnd").classList.remove("hidden");
+}
+function nextSeason(){
+  const rng=mulberry32((Math.random()*1e9)|0);
+  endSeasonProgression(rng);
+  career.season++; career.eventIdx=0; career.wc={};
+  career.calendar=makeCalendar(career.season);
+  career.stats.sWins=0; career.stats.sPodiums=0; career.stats.sStarts=0;
+  career.lastResult=null; career._trainedAt=-1;
+  career.player.form=clamp(career.player.form+0.2,0.4,1);  // frische Saison
+  saveCareer();
+  openCareerHub();
+}
+// ---- Persistenz Karriere ----
+function saveCareer(){
+  const {active,player,world,season,eventIdx,calendar,wc,seedBase,stats,lastResult,_trainedAt}=career;
+  Store.set("career",{active,player,world,season,eventIdx,calendar,wc,seedBase,stats,lastResult,_trainedAt});
+}
+function deleteCareer(){ Store.set("career",null); }
+
+/* ====================== Input ====================== */
+let leanId=null, lastX=0, lastY=0, downT=0, moved=0;
+sensEl.addEventListener("input",()=>{$("sensVal").textContent=sensEl.value;});
+commEl.addEventListener("change",()=>{ Andi.on=commEl.checked;
+  if (!Andi.on && "speechSynthesis" in window) speechSynthesis.cancel(); });
+sndEl.addEventListener("change",()=>{ Snd.on=sndEl.checked;
+  if (Snd.ready) Snd.setWind(0,false); });
+// iOS: Sprachsynthese erst nach erster Nutzergeste freischalten
+addEventListener("pointerdown",()=>{ Andi.unlock(); Snd.unlock(); },{once:true,capture:true});
+function degPerPx(){ return 0.07*Number(sensEl.value); }
+
+const stage=document.getElementById("stage");
+stage.addEventListener("pointerdown",e=>{
+  e.preventDefault();
+  if (replay) return;                       // im Replay keine Eingabe
+  if (game.state==="inrun"){ takeoffTap(); leanId=e.pointerId;
+    lastX=e.clientX; lastY=e.clientY; downT=performance.now(); moved=0; return; }
+  if (game.state==="flight"){
+    if (controlMode==="gyro"){ flare(); return; }   // im Gyro-Modus: Tap = Telemark
+    if (leanId===null){ leanId=e.pointerId;
+      lastX=e.clientX; lastY=e.clientY; downT=performance.now(); moved=0; }
+    else flare();
+  }
+},{passive:false});
+stage.addEventListener("pointermove",e=>{
+  if (e.pointerId!==leanId || replay || controlMode==="gyro") return;
+  const dx=e.clientX-lastX, dy=e.clientY-lastY;
+  lastX=e.clientX; lastY=e.clientY;
+  moved+=Math.abs(dx)+Math.abs(dy);
+  const dv = ROT? -dx : dy;
+  if (game.state==="flight")
+    game.B=clamp(game.B+dv*degPerPx(),PHYS.leanMin,PHYS.leanMax);
+});
+function endPointer(e){
+  if (e.pointerId!==leanId) return;
+  const dt=performance.now()-downT;
+  if (game.state==="flight" && dt<190 && moved<12) flare();
+  leanId=null;
+}
+stage.addEventListener("pointerup",endPointer);
+stage.addEventListener("pointercancel",endPointer);
+menu.addEventListener("pointerdown",e=>e.stopPropagation());
+result.addEventListener("pointerdown",e=>e.stopPropagation());
+$("standings").addEventListener("pointerdown",e=>e.stopPropagation());
+$("netMenu").addEventListener("pointerdown",e=>e.stopPropagation());
+$("startBtn").addEventListener("click",e=>{ e.stopPropagation();
+  if (comp.mode==="single"){ compReset(); newJump(); }
+  else if (comp.mode==="local"){
+    comp.players=[...$("plNames").querySelectorAll("input")].map((inp,i)=>
+      ({id:"p"+i, name:inp.value.trim()||OOE.randName(), local:true, scores:[], dists:[]}));
+    comp.rounds=Number(document.querySelector("#roundSeg .segbtn.active")?.dataset.rounds||2);
+    startCompetition();
+  }
+});
+function afterResult(){ saveState();
+  if (career.inEvent) careerAfterJump();
+  else if (comp.active) compAdvance();
+  else newJump(); }
+$("again").addEventListener("click",e=>{ e.stopPropagation(); afterResult(); });
+$("replayBtn").addEventListener("click",e=>{ e.stopPropagation();
+  const r=replays[CUR.id]; if (r) startReplay(r); });
+$("stAgainBtn").addEventListener("click",e=>{ e.stopPropagation();
+  if (comp.mode==="net"){ $("standings").classList.add("hidden"); $("netMenu").classList.remove("hidden"); }
+  else { $("standings").classList.add("hidden"); startCompetition(); } });
+$("stMenuBtn").addEventListener("click",e=>{ e.stopPropagation();
+  compReset(); $("standings").classList.add("hidden"); menu.classList.remove("hidden"); });
+
+// ---- Karriere-Buttons ----
+["careerCreate","careerHub","careerTrain","careerEventRes","careerSeasonEnd"].forEach(id=>
+  $(id).addEventListener("pointerdown",e=>e.stopPropagation()));
+$("ccDice").addEventListener("click",e=>{ e.stopPropagation();
+  ccDraft.name=OOE.randName(); ccDraft.home=OOE.randOrt();
+  $("ccName").value=ccDraft.name; $("ccHome").textContent="aus "+ccDraft.home+" (OÖ)"; });
+$("ccStartBtn").addEventListener("click",e=>{ e.stopPropagation(); startCareer(); });
+$("ccBackBtn").addEventListener("click",e=>{ e.stopPropagation();
+  hideAllBoards(); setMode("single"); menu.classList.remove("hidden"); });
+$("chJumpBtn").addEventListener("click",e=>{ e.stopPropagation(); startCareerEvent(); });
+$("chTrainBtn").addEventListener("click",e=>{ e.stopPropagation(); openTraining(); });
+$("chSaveBtn").addEventListener("click",e=>{ e.stopPropagation(); saveCareer(); setHint("Karriere gespeichert!",2); });
+$("chMenuBtn").addEventListener("click",e=>{ e.stopPropagation();
+  hideAllBoards(); setMode("single"); menu.classList.remove("hidden"); });
+$("ctDoneBtn").addEventListener("click",e=>{ e.stopPropagation(); saveCareer(); openCareerHub(); });
+$("ctRestBtn").addEventListener("click",e=>{ e.stopPropagation(); restDay(); });
+$("ceNextBtn").addEventListener("click",e=>{ e.stopPropagation(); afterCareerEvent(); });
+$("seNextBtn").addEventListener("click",e=>{ e.stopPropagation(); nextSeason(); });
+$("seMenuBtn").addEventListener("click",e=>{ e.stopPropagation();
+  deleteCareer(); career.active=false; hideAllBoards(); setMode("single"); menu.classList.remove("hidden"); });
+
+// Modus-, Spielerzahl- und Runden-Auswahl
+document.querySelectorAll("#modeSeg .segbtn").forEach(b=>
+  b.addEventListener("click",e=>{ e.stopPropagation(); setMode(b.dataset.mode); }));
+document.querySelectorAll("#plSeg .segbtn").forEach(b=>
+  b.addEventListener("click",e=>{ e.stopPropagation();
+    document.querySelectorAll("#plSeg .segbtn").forEach(x=>x.classList.toggle("active",x===b));
+    rebuildPlayerNames(); }));
+document.querySelectorAll("#roundSeg .segbtn").forEach(b=>
+  b.addEventListener("click",e=>{ e.stopPropagation();
+    document.querySelectorAll("#roundSeg .segbtn").forEach(x=>x.classList.toggle("active",x===b));
+    $("roundsVal").textContent=b.dataset.rounds; }));
+$("exportBtn").addEventListener("click",e=>{ e.stopPropagation(); exportSave(); });
+$("importBtn").addEventListener("click",e=>{ e.stopPropagation(); $("importFile").click(); });
+$("importFile").addEventListener("change",e=>{ if (e.target.files[0]) importSave(e.target.files[0]); });
+
+// ---- WLAN-Menü ----
+function netStatus(t,cls){ const el=$("netStatus"); el.textContent=t;
+  el.className="netstatus"+(cls?" "+cls:""); }
+function netInit(){
+  netMyName=OOE.randName();
+  document.querySelectorAll("#netRoleSeg .segbtn").forEach(b=>b.classList.toggle("active",b.dataset.role==="host"));
+  $("netHost").classList.remove("hidden"); $("netGuest").classList.add("hidden");
+  $("hostOffer").value=""; $("hostAnswer").value=""; $("guestOffer").value=""; $("guestAnswer").value="";
+  netStatus("Erzeuge Einladungs-Code …");
+  Net.createOffer().then(code=>{ $("hostOffer").value=code; netStatus("Code bereit – an Gast schicken."); })
+    .catch(()=>{ netStatus("WebRTC hier nicht verfügbar.","err"); });
+}
+document.querySelectorAll("#netRoleSeg .segbtn").forEach(b=>
+  b.addEventListener("click",async e=>{ e.stopPropagation();
+    document.querySelectorAll("#netRoleSeg .segbtn").forEach(x=>x.classList.toggle("active",x===b));
+    const host=b.dataset.role==="host";
+    $("netHost").classList.toggle("hidden",!host);
+    $("netGuest").classList.toggle("hidden",host);
+    if (host){ netStatus("Erzeuge Einladungs-Code …");
+      try{ $("hostOffer").value=await Net.createOffer(); netStatus("Code bereit – an Gast schicken."); }
+      catch(err){ netStatus("WebRTC nicht verfügbar.","err"); } }
+    else netStatus("Einladungs-Code des Gastgebers einfügen.");
+  }));
+$("hostConnectBtn").addEventListener("click",async e=>{ e.stopPropagation();
+  try{ await Net.acceptAnswer($("hostAnswer").value); netStatus("Verbinde …"); }
+  catch(err){ netStatus("Antwort-Code ungültig.","err"); } });
+$("guestGenBtn").addEventListener("click",async e=>{ e.stopPropagation();
+  netStatus("Erzeuge Antwort-Code …");
+  try{ $("guestAnswer").value=await Net.makeAnswer($("guestOffer").value);
+    netStatus("Antwort-Code bereit – zurückschicken."); }
+  catch(err){ netStatus("Einladungs-Code ungültig.","err"); } });
+$("netBackBtn").addEventListener("click",e=>{ e.stopPropagation();
+  Net.reset(); $("netMenu").classList.add("hidden"); menu.classList.remove("hidden"); setMode("single"); });
+
+// ---- Netzwerk-Spiel-Logik ----
+let netPeerName="";
+function netGotPeer(name){
+  netPeerName=name||"Gast";
+  netStatus("Verbunden mit "+netPeerName+"!","ok");
+  if (Net.isHost){
+    comp.mode="net"; comp.rounds=Number(document.querySelector("#roundSeg .segbtn.active")?.dataset.rounds||2);
+    comp.seedBase=(Math.random()*1e9)|0; comp.hill=CUR.id; comp.myId="host";
+    comp.players=[{id:"host",name:netMyName,local:true,scores:[],dists:[]},
+                  {id:"guest",name:netPeerName,local:false,scores:[],dists:[]}];
+    Net.send({t:"config", hill:comp.hill, rounds:comp.rounds, seedBase:comp.seedBase,
+              hostName:netMyName, guestName:netPeerName});
+    comp.active=true; comp.round=0; comp.idx=0;
+    setTimeout(()=>{ $("netMenu").classList.add("hidden"); newJump(); },600);
+  }
+}
+function netGotConfig(m){
+  comp.mode="net"; comp.hill=m.hill; comp.rounds=m.rounds; comp.seedBase=m.seedBase;
+  CUR=HILLS[m.hill]||CUR; comp.myId="guest";
+  comp.players=[{id:"host",name:m.hostName,local:false,scores:[],dists:[]},
+                {id:"guest",name:m.guestName,local:true,scores:[],dists:[]}];
+  comp.active=true; comp.round=0; comp.idx=0;
+  $("netMenu").classList.add("hidden");
+  waitForRemote();
+}
+function netGotJump(m){
+  const pl=comp.players.find(p=>p.id===m.id); if (!pl) return;
+  if (pl.scores.length<=m.round){ pl.scores[m.round]=m.score; pl.dists[m.round]=m.dist; }
+  if (comp.active && comp.players[comp.idx] && comp.players[comp.idx].id===m.id
+      && game.state==="result"){ advanceFromRemote(); }
+}
+function advanceFromRemote(){
+  comp.idx++;
+  if (comp.idx>=comp.players.length){ comp.idx=0; comp.round++; }
+  if (comp.round>=comp.rounds){ showFinalStandings(); return; }
+  const pl=comp.players[comp.idx];
+  if (pl.id!==comp.myId) waitForRemote(); else newJump();
+}
+
+const keys={};
+addEventListener("keydown",e=>{
+  keys[e.code]=true;
+  if (e.code==="Space"||e.code==="Enter"){
+    e.preventDefault();
+    if (game.state==="menu"||game.state==="result") newJump();
+    else if (game.state==="inrun") takeoffTap();
+    else if (game.state==="flight") flare();
+  }
+});
+addEventListener("keyup",e=>keys[e.code]=false);
+
+/* ====================== Hauptschleife ====================== */
+function frame(now){
+  if (!game.last) game.last=now;
+  let ft=Math.min(0.1,(now-game.last)/1000); game.last=now;
+  game.acc+=ft;
+  while (game.acc>=PHYS.dt){
+    if (!replay && game.state==="flight"){
+      if (controlMode==="gyro" && Gyro.have){
+        // Neigung -> Ziel-Fluglage; Empfindlichkeit skaliert; sanft nachführen
+        const tilt=(Gyro.raw-Gyro.base);
+        const target=clamp(30 - tilt*(0.6*Number(sensEl.value)*0.5+0.4)*1.3,PHYS.leanMin,PHYS.leanMax);
+        game.B += (target-game.B)*0.18;
+      }
+      if (keys.ArrowUp)   game.B=clamp(game.B-70*PHYS.dt,PHYS.leanMin,PHYS.leanMax);
+      if (keys.ArrowDown) game.B=clamp(game.B+70*PHYS.dt,PHYS.leanMin,PHYS.leanMax);
+    }
+    if (game.state!=="menu" && game.state!=="result") physStep(PHYS.dt);
+    else stepWind(PHYS.dt);
+    game.acc-=PHYS.dt;
+  }
+  const tgt=camTarget(), k=1-Math.exp(-ft*5);
+  cam.x+=(tgt.x-cam.x)*k; cam.y+=(tgt.y-cam.y)*k; cam.ppm+=(tgt.ppm-cam.ppm)*k;
+  const spd = (game.state==="inrun")?game.v
+            : (game.state==="flight"||game.state==="slide")?Math.hypot(game.vx,game.vy):0;
+  Snd.setWind(spd, game.state==="inrun"||game.state==="flight");
+  render(now/1000, ft); updateChips();
+  requestAnimationFrame(frame);
+}
+rollWind();
+// Persistenz laden, dann Settings-Änderungen automatisch speichern
+loadState().then(()=>{
+  [sensEl,sndEl,commEl,aidEl].forEach(el=>el.addEventListener("change",saveState));
+  sensEl.addEventListener("change",saveState);
+});
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
