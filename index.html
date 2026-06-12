@@ -107,6 +107,12 @@
   .lastline{font-size:12px;color:var(--ink);margin:2px 0 6px;padding:6px 8px;
     border-left:2px solid var(--accent);background:rgba(255,210,63,.06)}
   .lastline b{color:var(--accent)}
+  .roster{display:flex;flex-direction:column;gap:6px;margin:4px 0 2px}
+  .roster .rcard{border:1px solid var(--line);border-radius:3px;padding:7px 9px;
+    background:rgba(8,15,30,.5);display:flex;justify-content:space-between;align-items:center;gap:8px}
+  .roster .rcard .who{display:flex;align-items:center;gap:8px;font-weight:600}
+  .roster .rcard .dot{width:14px;height:14px;border-radius:50%;border:1px solid rgba(255,255,255,.3)}
+  .roster .rcard .meta{font-size:11px;color:var(--dim)}
   .unit{font-size:16px;color:var(--dim)}
   .ctrl{margin:12px 0 4px;font-size:13px;color:var(--dim)}
   .chk{display:flex;align-items:center;gap:8px;margin-top:10px}
@@ -146,7 +152,7 @@
 
 <!-- ===================== Startmenü ===================== -->
 <div id="menu" class="board">
-  <div class="eyebrow">SkiFlug OÖ · M4 · Servas &amp; Schi Heil!</div>
+  <div class="eyebrow">SkiFlug OÖ · M4+ · Servas &amp; Schi Heil!</div>
   <h1 id="mTitle">HINZENBACH</h1>
   <div class="sub" id="mSub">HS90 · K-Punkt 85 m · Flutlicht-Nachtspringen</div>
   <div class="ctrl">Modus</div>
@@ -230,9 +236,16 @@
 
 <!-- ===================== Karriere: Springer erstellen ===================== -->
 <div id="careerCreate" class="board hidden">
-  <div class="eyebrow">Karriere · Neuer Springer</div>
-  <h1>DEIN SPRINGER</h1>
-  <div class="plnames" style="margin-bottom:8px"><div class="pl">
+  <div class="eyebrow" id="ccEye">Karriere · Neuer Springer</div>
+  <h1 id="ccH1">DEIN SPRINGER</h1>
+  <div class="ctrl">Menschliche Springer (Hot-Seat)</div>
+  <div class="seg" id="ccCountSeg">
+    <button class="segbtn active" data-cnt="1">1</button>
+    <button class="segbtn" data-cnt="2">2</button>
+    <button class="segbtn" data-cnt="3">3</button>
+    <button class="segbtn" data-cnt="4">4</button>
+  </div>
+  <div class="plnames" style="margin:8px 0"><div class="pl">
     <input id="ccName" placeholder="Name eingeben" maxlength="22" autocomplete="off">
     <button id="ccDice" class="dice">🎲</button>
   </div></div>
@@ -253,9 +266,10 @@
   <div id="chStats" class="statline">–</div>
   <div id="chLast" class="lastline" style="display:none">–</div>
   <div id="chAttrs" class="attrlist mini"></div>
+  <div id="chRoster" class="roster"></div>
   <div class="ctrl">Nächster Bewerb</div>
   <div id="chNext" class="nextcard">–</div>
-  <div class="ctrl">Weltcup-Gesamtstand</div>
+  <div class="ctrl" id="chWCLabel">Weltcup-Gesamtstand</div>
   <div id="chWC" class="rows"></div>
   <button id="chJumpBtn" class="btn">▶ Zum Bewerb</button>
   <div class="menurow">
@@ -268,7 +282,8 @@
 <!-- ===================== Karriere: Training ===================== -->
 <div id="careerTrain" class="board hidden">
   <div class="eyebrow">Karriere · Trainingslager</div>
-  <h1>TRAINING</h1>
+  <h1 id="ctH1">TRAINING</h1>
+  <div id="ctWho" class="seg" style="flex-wrap:wrap"></div>
   <div class="sub" id="ctInfo">Verteile deine Trainingspunkte. Übertraining kostet Form – Erholung gibt sie zurück.</div>
   <div class="ctrl">Form: <span id="ctForm">–</span> · noch <span id="ctPool">0</span> Punkte</div>
   <div id="ctAttrs" class="attrlist"></div>
@@ -710,12 +725,15 @@ const SUITS=["#d7263d","#3a86ff","#2bb673","#ffd23f","#8e44ad","#e8e8e8","#ff7a3
 const HELMETS=["#ffd23f","#d7263d","#1a2336","#3a86ff","#2bb673","#e8e8e8"];
 
 const career = {
-  active:false, inEvent:false, player:null, world:[], season:1,
-  eventIdx:0, calendar:[], wc:{}, eventScores:{}, eventRound:0, seedBase:0, mod:null,
-  stats:{wins:0,podiums:0,starts:0,titles:0,bestJump:0,careerPts:0,trained:0,seasons:0,
-    sWins:0,sPodiums:0,sStarts:0},
-  lastResult:null, _trainPool:0, _trainedAt:-1
+  active:false, inEvent:false,
+  humans:[],            // menschliche Springer (Hot-Seat): {id:"h0",name,colors,attrs,age,form,stats}
+  player:null,          // transienter Zeiger auf den aktuell springenden Menschen
+  world:[], season:1,
+  eventIdx:0, calendar:[], wc:{}, eventScores:{}, eventRound:0, evHumanIdx:0,
+  seedBase:0, mod:null, lastResult:null
 };
+function freshStats(){ return {wins:0,podiums:0,starts:0,titles:0,bestJump:0,careerPts:0,
+  trained:0,seasons:0,sWins:0,sPodiums:0,sStarts:0}; }
 function nrm(a){ return clamp(a/10,0,1); }
 
 function makeCalendar(season){
@@ -785,7 +803,7 @@ function awardWC(ranking){
   ranking.forEach((e,i)=>{ if(i<30){ career.wc[e.id]=(career.wc[e.id]||0)+WC_POINTS[i]; } });
 }
 function wcSorted(){
-  const all=[career.player,...career.world];
+  const all=[...career.humans,...career.world];
   return all.map(j=>({j,pts:career.wc[j.id]||0})).sort((a,b)=>b.pts-a.pts);
 }
 function ageCurvePeak(age){ // Multiplikator 0.6..1.0 je nach Alter
@@ -811,8 +829,8 @@ function endSeasonProgression(rng){
   while(keep.length<career.world.length)        // Nachwuchs auffüllen
     keep.push(genJumper(rng,{age:17+(rng()*2|0),level:0.3+rng()*0.4}));
   career.world=keep;
-  // Spieler altert ebenfalls (Attribute leicht von Form/Alter beeinflusst, kein Auto-Abbau der Basiswerte)
-  career.player.age++;
+  // Menschliche Springer altern ebenfalls (kein Auto-Abbau der Basiswerte)
+  for(const h of career.humans) h.age++;
 }
 
 const looseSki = {on:false,x:0,y:0,vx:0,vy:0,rot:0,vr:0};
@@ -1676,8 +1694,10 @@ function finishJump(){
   result.classList.remove("hidden");
 }
 function renderCareerInline(){
-  const ps=career.eventScores.player;
-  $("rScoreLine").innerHTML += '<br><span style="color:var(--dim)">Bewerb gesamt: '+ps.tot.toFixed(1)+' Pkt</span>';
+  const ps=career.eventScores[career.player.id];
+  let txt='Bewerb gesamt: '+ps.tot.toFixed(1)+' Pkt';
+  if (career.humans.length>1) txt=career.player.name+" – "+txt;
+  $("rScoreLine").innerHTML += '<br><span style="color:var(--dim)">'+txt+'</span>';
 }
 
 /* ====================== Bewerbs-Ablauf & Standings ====================== */
@@ -1893,40 +1913,59 @@ function attrBar(k,val){ return '<div class="attrrow"><span class="nm">'+ATTR_NA
 // Einstieg: gespeicherte Karriere fortsetzen oder neu erstellen
 async function openCareerEntry(){
   const saved=await Store.get("career");
-  if (saved && saved.player){ career.active=true;
-    Object.assign(career,saved);
-    if (!career.stats) career.stats={wins:0,podiums:0,starts:0,titles:0,bestJump:0,careerPts:0,trained:0,seasons:0,sWins:0,sPodiums:0,sStarts:0};
-    if (career._trainedAt==null) career._trainedAt=-1;
+  if (saved && (saved.humans || saved.player)){ career.active=true;
+    migrateCareer(saved);
     openCareerHub(); }
   else openCareerCreate();
 }
-// ---- Springer erstellen ----
-let ccDraft=null;
+// Alte Single-Player-Saves (career.player) auf humans[] migrieren
+function migrateCareer(saved){
+  Object.assign(career,saved);
+  if (!career.humans || !career.humans.length){
+    const p=saved.player || null;
+    if (p){ p.id="h0"; if(!p.stats)p.stats=freshStats(); career.humans=[p];
+      if (career.wc && career.wc["player"]!=null){ career.wc["h0"]=career.wc["player"]; delete career.wc["player"]; } }
+    else career.humans=[];
+  }
+  career.humans.forEach((h,i)=>{ if(!h.id)h.id="h"+i; if(!h.stats)h.stats=freshStats(); });
+  career.player=null;
+}
+// ---- Springer erstellen (1–4 Menschen nacheinander) ----
+let ccDrafts=[], ccIdx=0, ccCount=1, ccDraft=null;
+function newDraft(i){ return { name:OOE.randName(), home:OOE.randOrt(),
+  colors:{suit:SUITS[i%SUITS.length],helmet:HELMETS[i%HELMETS.length]},
+  attrs:{power:5,flight:5,stability:5,telemark:5,nerves:5}, pool:10 }; }
 function openCareerCreate(){
   hideAllBoards();
-  ccDraft={ name:OOE.randName(), home:OOE.randOrt(),
-    colors:{suit:SUITS[0],helmet:HELMETS[0]},
-    attrs:{power:5,flight:5,stability:5,telemark:5,nerves:5}, pool:10 };
+  ccCount=1; ccIdx=0; ccDrafts=[newDraft(0)];
+  document.querySelectorAll("#ccCountSeg .segbtn").forEach(b=>
+    b.classList.toggle("active", b.dataset.cnt==="1"));
+  loadDraftIntoForm();
+  $("careerCreate").classList.remove("hidden");
+}
+function ccSaveCurrent(){
+  ccDraft.name=$("ccName").value.trim()||ccDraft.name;
+}
+function loadDraftIntoForm(){
+  ccDraft=ccDrafts[ccIdx];
+  $("ccEye").textContent="Karriere · Springer "+(ccIdx+1)+" / "+ccCount;
+  $("ccH1").textContent= ccCount>1 ? ("SPRINGER "+(ccIdx+1)) : "DEIN SPRINGER";
   $("ccName").value=ccDraft.name;
   $("ccHome").textContent="aus "+ccDraft.home+" (OÖ)";
-  // Farb-Swatches
-  const cr=$("ccColors"); cr.innerHTML="";
+  const cr=$("ccColors");
   const mkCol=(label,arr,key)=>{
     const col=document.createElement("div"); col.className="swcol";
     col.innerHTML='<span class="lbl">'+label+'</span>';
     arr.forEach(c=>{ const s=document.createElement("div");
       s.className="sw"+(ccDraft.colors[key]===c?" sel":""); s.style.background=c;
-      s.addEventListener("click",e=>{ e.stopPropagation(); ccDraft.colors[key]=c;
-        cr.querySelectorAll(".swcol").length; openCareerCreate.repaintColors(); });
+      s.addEventListener("click",e=>{ e.stopPropagation(); ccDraft.colors[key]=c; repaintColors(); });
       col.appendChild(s); });
     cr.appendChild(col);
   };
-  openCareerCreate.repaintColors=()=>{
-    cr.innerHTML=""; mkCol("Anzug",SUITS,"suit"); mkCol("Helm",HELMETS,"helmet");
-  };
-  openCareerCreate.repaintColors();
+  function repaintColors(){ cr.innerHTML=""; mkCol("Anzug",SUITS,"suit"); mkCol("Helm",HELMETS,"helmet"); }
+  repaintColors();
   renderCcAttrs();
-  $("careerCreate").classList.remove("hidden");
+  $("ccStartBtn").textContent = (ccIdx<ccCount-1) ? "Weiter →" : "Karriere starten";
 }
 function renderCcAttrs(){
   $("ccPool").textContent=ccDraft.pool;
@@ -1945,41 +1984,70 @@ function renderCcAttrs(){
     row.appendChild(minus); row.appendChild(plus); box.appendChild(row);
   }
 }
+function setCcCount(n){
+  ccCount=n;
+  while(ccDrafts.length<n) ccDrafts.push(newDraft(ccDrafts.length));
+  ccDrafts.length=n;
+  if (ccIdx>=n) ccIdx=n-1;
+  document.querySelectorAll("#ccCountSeg .segbtn").forEach(b=>
+    b.classList.toggle("active", Number(b.dataset.cnt)===n));
+  loadDraftIntoForm();
+}
+function ccAdvance(){
+  ccSaveCurrent();
+  if (ccIdx<ccCount-1){ ccIdx++; loadDraftIntoForm(); }
+  else startCareer();
+}
 function startCareer(){
   const rng=mulberry32((Math.random()*1e9)|0);
   career.active=true; career.season=1; career.eventIdx=0;
   career.seedBase=(Math.random()*1e9)|0;
-  career.player={ id:"player", name:$("ccName").value.trim()||ccDraft.name, nation:"AUT",
-    home:ccDraft.home, colors:{...ccDraft.colors}, attrs:{...ccDraft.attrs}, age:18, form:0.5, ai:false };
+  career.humans=ccDrafts.map((d,i)=>({ id:"h"+i, name:d.name||OOE.randName(), nation:"AUT",
+    home:d.home, colors:{...d.colors}, attrs:{...d.attrs}, age:18, form:0.5, ai:false,
+    stats:freshStats(), _trainedAt:-1, _trainPool:0 }));
   career.world=genWorld(rng, 48);
   career.calendar=makeCalendar(1);
-  career.wc={};
-  career.stats={wins:0,podiums:0,starts:0,titles:0,bestJump:0,careerPts:0,trained:0,seasons:0,sWins:0,sPodiums:0,sStarts:0};
-  career.lastResult=null; career._trainedAt=-1;
+  career.wc={}; career.lastResult=null;
   saveCareer();
   openCareerHub();
 }
+const MP=()=>career.humans.length>1;
 // ---- Hub ----
 function openCareerHub(){
   hideAllBoards();
-  const p=career.player;
-  $("chSeason").textContent="Saison "+career.season+" · "+p.home;
-  $("chName").textContent=p.name.toUpperCase();
-  $("chMeta").textContent=p.age+" Jahre · Form "+formLabel(p.form)+" · Bewerb "
-    +(career.eventIdx)+"/"+career.calendar.length;
-  $("chAttrs").innerHTML=ATTR_KEYS.map(k=>attrBar(k,p.attrs[k])).join("");
-  // Karriere-Statistik + letztes Ergebnis
-  const st=career.stats;
-  let line='<span style="color:var(--accent)">'+st.wins+'</span> Siege · '
-    +'<span style="color:var(--accent)">'+st.podiums+'</span> Podeste · '
-    +st.starts+' Starts';
-  if (st.titles>0) line='🏆 '+st.titles+' Gesamt-WC · '+line;
-  if (st.bestJump>0) line+=' · weitester '+st.bestJump.toFixed(1)+' m';
-  $("chStats").innerHTML=line;
-  if (career.lastResult){ const lr=career.lastResult;
-    $("chLast").innerHTML='Zuletzt '+lr.hill+': <b>Platz '+lr.place+'</b> (+'+lr.gained+' WC, '+lr.dist.toFixed(1)+' m)';
-    $("chLast").style.display="block";
-  } else $("chLast").style.display="none";
+  const lead=career.humans[0];
+  $("chSeason").textContent="Saison "+career.season+" · "+(MP()?career.humans.length+" Springer":lead.home);
+  if (MP()){
+    $("chName").textContent="HOT-SEAT-KARRIERE";
+    $("chMeta").textContent="Bewerb "+career.eventIdx+"/"+career.calendar.length+" · gemeinsamer Weltcup";
+    $("chAttrs").innerHTML="";
+    // Roster aller Menschen
+    $("chRoster").innerHTML=career.humans.map(h=>{
+      const wcp=career.wc[h.id]||0;
+      return '<div class="rcard"><span class="who"><span class="dot" style="background:'+h.colors.suit+'"></span>'
+        +h.name+'</span><span class="meta">'+h.age+'J · Form '+Math.round(h.form*100)+'% · '
+        +(h.stats.wins||0)+'🥇 · '+wcp+' WC</span></div>';
+    }).join("");
+    $("chStats").innerHTML="";
+    $("chLast").style.display="none";
+  } else {
+    const p=lead;
+    $("chRoster").innerHTML="";
+    $("chName").textContent=p.name.toUpperCase();
+    $("chMeta").textContent=p.age+" Jahre · Form "+formLabel(p.form)+" · Bewerb "
+      +(career.eventIdx)+"/"+career.calendar.length;
+    $("chAttrs").innerHTML=ATTR_KEYS.map(k=>attrBar(k,p.attrs[k])).join("");
+    const st=p.stats;
+    let line='<span style="color:var(--accent)">'+st.wins+'</span> Siege · '
+      +'<span style="color:var(--accent)">'+st.podiums+'</span> Podeste · '+st.starts+' Starts';
+    if (st.titles>0) line='🏆 '+st.titles+' Gesamt-WC · '+line;
+    if (st.bestJump>0) line+=' · weitester '+st.bestJump.toFixed(1)+' m';
+    $("chStats").innerHTML=line;
+    if (career.lastResult){ const lr=career.lastResult;
+      $("chLast").innerHTML='Zuletzt '+lr.hill+': <b>Platz '+lr.place+'</b> (+'+lr.gained+' WC, '+lr.dist.toFixed(1)+' m)';
+      $("chLast").style.display="block";
+    } else $("chLast").style.display="none";
+  }
   // nächster Bewerb
   const ev=career.calendar[career.eventIdx];
   if (ev){
@@ -1993,31 +2061,44 @@ function openCareerHub(){
     $("chNext").innerHTML="<b>Saison beendet</b> – Zeit für die Siegerehrung!";
     $("chJumpBtn").style.display="none";
   }
-  // WC-Stand top 6
+  // gemeinsamer WC-Stand top 6
   const wc=wcSorted().slice(0,6);
+  const humanIds=new Set(career.humans.map(h=>h.id));
   $("chWC").innerHTML=wc.map((e,i)=>{
-    const me=e.j.id==="player"?" me":""; const lead=i===0?" lead":"";
-    return '<div class="r'+me+lead+'"><span><span class="rank">'+(i+1)+'.</span>'+e.j.name+'</span><b>'+e.pts+'</b></div>';
+    const me=humanIds.has(e.j.id)?" me":""; const ld=i===0?" lead":"";
+    return '<div class="r'+me+ld+'"><span><span class="rank">'+(i+1)+'.</span>'+e.j.name+'</span><b>'+e.pts+'</b></div>';
   }).join("");
-  if (!ev) $("chJumpBtn").style.display="none";
   $("careerHub").classList.remove("hidden");
 }
-// ---- Bewerb starten (Spieler springt selbst) ----
+// ---- Bewerb starten: alle Menschen springen reihum ----
 function startCareerEvent(){
   const ev=career.calendar[career.eventIdx]; if(!ev) return;
-  career.inEvent=true; career.eventRound=0;
-  career.eventScores={}; career.eventScores.player={tot:0,best:0,jumps:[]};
+  career.inEvent=true;
+  career.eventScores={};
+  for(const h of career.humans) career.eventScores[h.id]={tot:0,best:0,jumps:[]};
   CUR=HILLS[ev.hillId];
-  setSuit(career.player.colors.suit, career.player.colors.helmet);
-  // Tagesform leicht würfeln
-  career.player.form=clamp(career.player.form+(Math.random()*0.3-0.15),0.2,1);
+  career.evHumanIdx=0;
+  beginHumanTurn(true);
+}
+function beginHumanTurn(first){
+  const h=career.humans[career.evHumanIdx];
+  career.player=h;
+  career.eventRound=0;
+  setSuit(h.colors.suit, h.colors.helmet);
+  h.form=clamp(h.form+(Math.random()*0.3-0.15),0.2,1);   // Tagesform
   career.mod=playerMods();
   hideAllBoards();
   careerNewJump();
+  if (MP()){
+    const msg = first&&career.evHumanIdx===0 ? h.name+" beginnt – an der Kante tippen!"
+      : "➡ Gerät an "+h.name+" weitergeben – dann tippen!";
+    setHint(msg,4);
+  }
 }
 function careerNewJump(){
   comp.active=false; replay=null;
   game.jumpNo++;
+  // gleicher Wind je (Bewerb, Durchgang) -> fair für alle Menschen
   game.rng=mulberry32(career.seedBase + career.eventIdx*7919 + career.eventRound*131 + 5);
   rollWind(); resetCommon();
   game.rec={ hill:CUR.id, seed:game.jumpNo, windBase:game.windBase, takeoffQ:0, flareTick:-1, leans:[] };
@@ -2027,31 +2108,35 @@ function careerNewJump(){
   Andi.say("start",{prio:true,force:true}); Snd.gate();
 }
 function finishCareerJump(){
-  // wird aus finishJump() gerufen, nachdem game.score gesetzt ist
   const sc=game.score;
   const pts=game.crashed? clamp(sc.distPts*0.3,0,40)+sc.stylePts : sc.total;
-  const ps=career.eventScores.player;
+  const ps=career.eventScores[career.player.id];
   ps.tot+=pts; ps.best=Math.max(ps.best,game.dist); ps.jumps.push({pts,dist:game.dist});
   const ev=career.calendar[career.eventIdx];
-  $("again").textContent = (career.eventRound>=ev.rounds-1)?"Bewerb auswerten":"Nächster Durchgang";
+  const lastRound=career.eventRound>=ev.rounds-1;
+  const lastHuman=career.evHumanIdx>=career.humans.length-1;
+  $("again").textContent = !lastRound ? "Nächster Durchgang"
+    : (lastHuman ? "Bewerb auswerten" : "Nächster Springer →");
 }
 function careerAfterJump(){
   saveCareer();
   const ev=career.calendar[career.eventIdx];
-  career.eventRound++;
   result.classList.add("hidden");
+  career.eventRound++;
   if (career.eventRound<ev.rounds){ careerNewJump(); return; }
-  // alle Durchgänge gesprungen -> KI simulieren & Bewerb auswerten
+  // dieser Mensch fertig -> nächster Mensch oder auswerten
+  career.evHumanIdx++;
+  if (career.evHumanIdx<career.humans.length){ beginHumanTurn(false); return; }
   evaluateCareerEvent();
 }
 function evaluateCareerEvent(){
   const ev=career.calendar[career.eventIdx]; const hill=HILL_DEFS[ev.hillId];
   const rng=mulberry32(career.seedBase + career.eventIdx*99991 + 7);
-  // KI-Tagesform
   for(const j of career.world) j.form=clamp(0.5+(rng()*0.5-0.25),0.15,1);
   const field=[];
-  field.push({id:"player", name:career.player.name, tot:career.eventScores.player.tot,
-    best:career.eventScores.player.best, me:true});
+  const humanIds=new Set(career.humans.map(h=>h.id));
+  for(const h of career.humans){ const es=career.eventScores[h.id];
+    field.push({id:h.id,name:h.name,tot:es.tot,best:es.best,me:true}); }
   for(const j of career.world){
     let tot=0,best=0;
     for(let r=0;r<ev.rounds;r++){ const res=aiJump(rng,hill,j); tot+=res.total; best=Math.max(best,res.dist); }
@@ -2059,88 +2144,141 @@ function evaluateCareerEvent(){
   }
   field.sort((a,b)=>b.tot-a.tot);
   awardWC(field);
-  // Ergebnis-Screen
-  const place=field.findIndex(f=>f.id==="player")+1;
-  const gained=place<=30?WC_POINTS[place-1]:0;
-  // ---- Karriere-Statistik ----
-  const st=career.stats;
-  st.starts++; st.sStarts++; st.careerPts+=gained;
-  if (place===1){ st.wins++; st.sWins++; }
-  if (place<=3){ st.podiums++; st.sPodiums++; }
-  st.bestJump=Math.max(st.bestJump, career.eventScores.player.best);
-  career.lastResult={ hill:hill.name.split(" · ")[0], place, gained,
-    dist:career.eventScores.player.best, tournee:!!ev.tournee, final:!!ev.final };
+  // Statistik je Mensch
+  for(const h of career.humans){
+    const place=field.findIndex(f=>f.id===h.id)+1;
+    const gained=place<=30?WC_POINTS[place-1]:0;
+    const st=h.stats;
+    st.starts++; st.sStarts++; st.careerPts+=gained;
+    if (place===1){ st.wins++; st.sWins++; }
+    if (place<=3){ st.podiums++; st.sPodiums++; }
+    st.bestJump=Math.max(st.bestJump, career.eventScores[h.id].best);
+    h.form=clamp(h.form+0.06,0.15,1);
+    h._lastPlace=place; h._lastGain=gained;
+  }
+  // bestplatzierter Mensch für die große Anzeige
+  let bestHuman=career.humans[0], bestPlace=999;
+  for(const h of career.humans){ if (h._lastPlace<bestPlace){ bestPlace=h._lastPlace; bestHuman=h; } }
+  career.lastResult={ hill:hill.name.split(" · ")[0], place:bestPlace, gained:bestHuman._lastGain,
+    dist:career.eventScores[bestHuman.id].best };
   hideAllBoards();
   $("ceEye").textContent=hill.name.split(" · ")[0]+" · "+(ev.final?"Skiflug-Finale":ev.tournee?"OÖ-Tournee":"Weltcup");
-  $("ceTitle").textContent= place===1?"🥇 SIEG!":place<=3?"🏆 PODEST!":"Platz "+place;
-  $("cePlace").textContent=place+".";
-  $("cePts").textContent="+"+gained+" WC";
-  $("ceList").innerHTML=field.slice(0,8).map((f,i)=>{
-    const me=f.me?" me":""; const lead=i===0?" lead":"";
-    return '<div class="r'+me+lead+'"><span><span class="rank">'+(i+1)+'.</span>'+f.name+'</span><b>'+f.tot.toFixed(1)+' · '+f.best.toFixed(1)+'m</b></div>';
-  }).join("") + (place>8?'<div class="r me"><span><span class="rank">'+place+'.</span>'+career.player.name+'</span><b>'+career.eventScores.player.tot.toFixed(1)+'</b></div>':'');
-  career.inEvent=false; career.mod=null;
+  if (MP()){
+    $("ceTitle").textContent="ERGEBNIS";
+    $("cePlace").textContent=bestPlace+".";
+    $("cePts").textContent=bestHuman.name.split(" ")[0];
+    // alle Menschen mit Platz auflisten + Top 3 Gesamt
+    const human=career.humans.map(h=>({h,place:field.findIndex(f=>f.id===h.id)+1}))
+      .sort((a,b)=>a.place-b.place);
+    let html=human.map(x=>'<div class="r me"><span><span class="rank">'+x.place+'.</span>'+x.h.name
+      +'</span><b>+'+(x.place<=30?WC_POINTS[x.place-1]:0)+' WC · '+career.eventScores[x.h.id].best.toFixed(1)+'m</b></div>').join("");
+    html+='<div class="r" style="opacity:.6;margin-top:4px"><span>— Bewerbs-Podest —</span><b></b></div>';
+    html+=field.slice(0,3).map((f,i)=>'<div class="r'+(i===0?" lead":"")+(humanIds.has(f.id)?" me":"")
+      +'"><span><span class="rank">'+["🥇","🥈","🥉"][i]+'</span>'+f.name+'</span><b>'+f.tot.toFixed(1)+'</b></div>').join("");
+    $("ceList").innerHTML=html;
+  } else {
+    const h=career.humans[0]; const place=h._lastPlace, gained=h._lastGain;
+    $("ceTitle").textContent= place===1?"🥇 SIEG!":place<=3?"🏆 PODEST!":"Platz "+place;
+    $("cePlace").textContent=place+".";
+    $("cePts").textContent="+"+gained+" WC";
+    $("ceList").innerHTML=field.slice(0,8).map((f,i)=>{
+      const me=humanIds.has(f.id)?" me":""; const ld=i===0?" lead":"";
+      return '<div class="r'+me+ld+'"><span><span class="rank">'+(i+1)+'.</span>'+f.name+'</span><b>'+f.tot.toFixed(1)+' · '+f.best.toFixed(1)+'m</b></div>';
+    }).join("") + (place>8?'<div class="r me"><span><span class="rank">'+place+'.</span>'+h.name+'</span><b>'+career.eventScores[h.id].tot.toFixed(1)+'</b></div>':'');
+  }
+  career.inEvent=false; career.mod=null; career.player=null;
   career.eventIdx++;
-  // Form erholt sich leicht zwischen Bewerben
-  career.player.form=clamp(career.player.form+0.06,0.15,1);
   saveCareer();
-  if (place===1){ Andi.say("record",{prio:true,force:true}); Snd.cheer(true); }
+  if (bestPlace===1){ Andi.say("record",{prio:true,force:true}); Snd.cheer(true); }
   $("careerEventRes").classList.remove("hidden");
 }
 function afterCareerEvent(){
   if (career.eventIdx>=career.calendar.length) openSeasonEnd();
   else openCareerHub();
 }
-// ---- Training ----
+// ---- Training (je Mensch) ----
 function formLabel(f){ const p=Math.round(f*100);
   return p+"% "+(p>=80?"🔥 top":p>=55?"👍 gut":p>=35?"😐 mittel":"😩 schwach"); }
+let ctWhoIdx=0;
 function openTraining(){
   hideAllBoards();
-  // Trainingspunkte einmal pro Bewerb; gemerkt über eventIdx
-  if (career._trainedAt!==career.eventIdx){ career._trainPool=3; career._trainedAt=career.eventIdx; }
+  ctWhoIdx=0;
+  // Springer-Auswahl bei mehreren Menschen
+  const who=$("ctWho");
+  if (MP()){
+    who.style.display="flex";
+    who.innerHTML=career.humans.map((h,i)=>
+      '<button class="segbtn'+(i===0?" active":"")+'" data-i="'+i+'">'+h.name.split(" ")[0]+'</button>').join("");
+    who.querySelectorAll(".segbtn").forEach(b=>b.addEventListener("click",e=>{ e.stopPropagation();
+      ctWhoIdx=Number(b.dataset.i);
+      who.querySelectorAll(".segbtn").forEach(x=>x.classList.toggle("active",x===b));
+      renderTrainAttrs(); }));
+  } else { who.style.display="none"; who.innerHTML=""; }
+  for(const h of career.humans){ if(h._trainedAt!==career.eventIdx){ h._trainPool=3; h._trainedAt=career.eventIdx; } }
   renderTrainAttrs();
   $("careerTrain").classList.remove("hidden");
 }
+function curTrainee(){ return career.humans[ctWhoIdx]; }
 function renderTrainAttrs(){
-  $("ctPool").textContent=career._trainPool;
-  $("ctForm").textContent=formLabel(career.player.form);
+  const h=curTrainee();
+  $("ctH1").textContent= MP()? ("TRAINING · "+h.name.split(" ")[0]) : "TRAINING";
+  $("ctPool").textContent=h._trainPool;
+  $("ctForm").textContent=formLabel(h.form);
   const box=$("ctAttrs"); box.innerHTML="";
   for(const k of ATTR_KEYS){
     const row=document.createElement("div"); row.className="attrrow";
     row.innerHTML='<span class="nm">'+ATTR_NAMES[k]+'</span>'+
-      '<div class="bar"><i style="width:'+(career.player.attrs[k]*10)+'%"></i></div>'+
-      '<span class="val">'+career.player.attrs[k]+'</span>';
+      '<div class="bar"><i style="width:'+(h.attrs[k]*10)+'%"></i></div>'+
+      '<span class="val">'+h.attrs[k]+'</span>';
     const plus=document.createElement("button"); plus.textContent="+";
     plus.addEventListener("click",e=>{ e.stopPropagation();
-      if(career._trainPool>0 && career.player.attrs[k]<10){
-        career.player.attrs[k]++; career._trainPool--;
-        career.player.form=clamp(career.player.form-0.05,0.15,1); // Übertraining kostet Form
-        career.stats.trained=(career.stats.trained||0)+1;
+      if(h._trainPool>0 && h.attrs[k]<10){
+        h.attrs[k]++; h._trainPool--;
+        h.form=clamp(h.form-0.05,0.15,1);
+        h.stats.trained=(h.stats.trained||0)+1;
         renderTrainAttrs(); } });
     row.appendChild(plus); box.appendChild(row);
   }
 }
 function restDay(){
-  career.player.form=clamp(career.player.form+0.12,0.15,1);
-  setHint("Erholt! Form jetzt "+Math.round(career.player.form*100)+"%",2);
+  const h=curTrainee();
+  h.form=clamp(h.form+0.12,0.15,1);
+  setHint("Erholt! Form jetzt "+Math.round(h.form*100)+"%",2);
   renderTrainAttrs();
 }
 // ---- Saisonende ----
 function openSeasonEnd(){
   hideAllBoards();
   const final=wcSorted();
-  const myPlace=final.findIndex(e=>e.j.id==="player")+1;
-  if (myPlace===1) career.stats.titles++;
-  career.stats.seasons++;
+  const humanIds=new Set(career.humans.map(h=>h.id));
+  const champ=final[0];
+  const champHuman = humanIds.has(champ.j.id);
+  // Titel für menschlichen Gesamtsieger
+  if (champHuman){ const h=career.humans.find(x=>x.id===champ.j.id); if(h) h.stats.titles++; }
+  for(const h of career.humans) h.stats.seasons++;
   $("seEye").textContent="Saison "+career.season+" · Abschluss";
-  $("seTitle").textContent= myPlace===1?"🏆 GESAMTWELTCUP-SIEGER!":"Gesamt-Platz "+myPlace;
-  const st=career.stats;
-  $("seSub").innerHTML="Saison-Bilanz: <b>"+st.sWins+"</b> Siege, <b>"+st.sPodiums
-    +"</b> Podeste in "+st.sStarts+" Starts.<br>Gesamtweltcup-Endstand:";
-  $("seList").innerHTML=final.slice(0,8).map((e,i)=>{
-    const me=e.j.id==="player"?" me":""; const lead=i===0?" lead":"";
-    return '<div class="r'+me+lead+'"><span><span class="rank">'+(i+1)+'.</span>'+e.j.name+'</span><b>'+e.pts+'</b></div>';
-  }).join("");
+  if (MP()){
+    $("seTitle").textContent= champHuman? ("🏆 "+champ.j.name) : ("Gesamtsieg: "+champ.j.name);
+    const order=career.humans.map(h=>({h,place:final.findIndex(e=>e.j.id===h.id)+1,pts:career.wc[h.id]||0}))
+      .sort((a,b)=>a.place-b.place);
+    $("seSub").innerHTML="Eure Saison-Plätze im Gesamtweltcup:";
+    $("seList").innerHTML=order.map(x=>'<div class="r me"><span><span class="rank">'+x.place+'.</span>'+x.h.name
+      +'</span><b>'+x.pts+' WC · '+(x.h.stats.sWins||0)+'🥇</b></div>').join("")
+      + '<div class="r" style="opacity:.6;margin-top:4px"><span>— Gesamt-Podest —</span><b></b></div>'
+      + final.slice(0,3).map((e,i)=>'<div class="r'+(i===0?" lead":"")+(humanIds.has(e.j.id)?" me":"")
+        +'"><span><span class="rank">'+["🥇","🥈","🥉"][i]+'</span>'+e.j.name+'</span><b>'+e.pts+'</b></div>').join("");
+  } else {
+    const myPlace=final.findIndex(e=>e.j.id===career.humans[0].id)+1;
+    const st=career.humans[0].stats;
+    $("seTitle").textContent= myPlace===1?"🏆 GESAMTWELTCUP-SIEGER!":"Gesamt-Platz "+myPlace;
+    $("seSub").innerHTML="Saison-Bilanz: <b>"+st.sWins+"</b> Siege, <b>"+st.sPodiums
+      +"</b> Podeste in "+st.sStarts+" Starts.<br>Gesamtweltcup-Endstand:";
+    $("seList").innerHTML=final.slice(0,8).map((e,i)=>{
+      const me=humanIds.has(e.j.id)?" me":""; const ld=i===0?" lead":"";
+      return '<div class="r'+me+ld+'"><span><span class="rank">'+(i+1)+'.</span>'+e.j.name+'</span><b>'+e.pts+'</b></div>';
+    }).join("");
+  }
+  saveCareer();
   $("careerSeasonEnd").classList.remove("hidden");
 }
 function nextSeason(){
@@ -2148,16 +2286,16 @@ function nextSeason(){
   endSeasonProgression(rng);
   career.season++; career.eventIdx=0; career.wc={};
   career.calendar=makeCalendar(career.season);
-  career.stats.sWins=0; career.stats.sPodiums=0; career.stats.sStarts=0;
-  career.lastResult=null; career._trainedAt=-1;
-  career.player.form=clamp(career.player.form+0.2,0.4,1);  // frische Saison
+  career.lastResult=null;
+  for(const h of career.humans){ h.stats.sWins=0; h.stats.sPodiums=0; h.stats.sStarts=0;
+    h._trainedAt=-1; h.form=clamp(h.form+0.2,0.4,1); }
   saveCareer();
   openCareerHub();
 }
 // ---- Persistenz Karriere ----
 function saveCareer(){
-  const {active,player,world,season,eventIdx,calendar,wc,seedBase,stats,lastResult,_trainedAt}=career;
-  Store.set("career",{active,player,world,season,eventIdx,calendar,wc,seedBase,stats,lastResult,_trainedAt});
+  const {active,humans,world,season,eventIdx,calendar,wc,seedBase,lastResult}=career;
+  Store.set("career",{active,humans,world,season,eventIdx,calendar,wc,seedBase,lastResult});
 }
 function deleteCareer(){ Store.set("career",null); }
 
@@ -2234,7 +2372,9 @@ $("stMenuBtn").addEventListener("click",e=>{ e.stopPropagation();
 $("ccDice").addEventListener("click",e=>{ e.stopPropagation();
   ccDraft.name=OOE.randName(); ccDraft.home=OOE.randOrt();
   $("ccName").value=ccDraft.name; $("ccHome").textContent="aus "+ccDraft.home+" (OÖ)"; });
-$("ccStartBtn").addEventListener("click",e=>{ e.stopPropagation(); startCareer(); });
+document.querySelectorAll("#ccCountSeg .segbtn").forEach(b=>
+  b.addEventListener("click",e=>{ e.stopPropagation(); ccSaveCurrent(); setCcCount(Number(b.dataset.cnt)); }));
+$("ccStartBtn").addEventListener("click",e=>{ e.stopPropagation(); ccAdvance(); });
 $("ccBackBtn").addEventListener("click",e=>{ e.stopPropagation();
   hideAllBoards(); setMode("single"); menu.classList.remove("hidden"); });
 $("chJumpBtn").addEventListener("click",e=>{ e.stopPropagation(); startCareerEvent(); });

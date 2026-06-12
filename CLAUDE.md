@@ -23,6 +23,7 @@ Neu in M4 – **Karrieremodus** (Menü → „Karriere"):
 - **Form-System:** Tagesform schwankt, Training kostet Form, Erholungstag (`restDay`) gibt sie zurück; Form erholt sich zwischen Bewerben/Saisons. Training nur einmal pro Bewerb (`_trainedAt`).
 - **Hub** zeigt Karrierebilanz + letztes Ergebnis; Saisonende mit Saison-Bilanz und Titelzählung.
 - Panels scrollen auf Touch (`touch-action: pan-y`); alle Eingaben/Buttons sind touch-bedienbar (Fix für nicht erreichbare Buttons/Namensfeld).
+- **Mehrspieler-Karriere (Hot-Seat, geteilte Saison):** 1–4 menschliche Springer (`career.humans[]`), nacheinander im Erstellungs-Screen angelegt (Name/Heimat/Farben/Attribute je Springer). In jedem Bewerb springt jeder Mensch reihum (Geräte-Weitergabe-Hinweis), danach simuliert die KI das restliche Feld. **Gemeinsamer Weltcup über die ganze Saison** (alle Menschen + KI in `career.wc`), gleicher Wind je Durchgang für Fairness. Hub zeigt das Roster aller Menschen + gemeinsamen WC-Stand; Training mit Springer-Auswahl; Saisonende mit Plätzen aller Menschen + Gesamt-Podest. Einzelspieler-Karriere bleibt der Spezialfall mit `humans.length===1` (alte Saves werden via `migrateCareer` auf `humans[]` migriert).
 
 Stand M1–M3 bleibt: Physik, 8 OÖ-Schanzen, FIS-Wertung/5 Richter, Touch/Gyro, Replays,
 prozeduraler Sound, Kommentator, PWA-Hülle, Persistenz/Export-Import, Mehrspieler lokal & WLAN.
