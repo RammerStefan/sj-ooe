@@ -113,6 +113,21 @@
   .roster .rcard .who{display:flex;align-items:center;gap:8px;font-weight:600}
   .roster .rcard .dot{width:14px;height:14px;border-radius:50%;border:1px solid rgba(255,255,255,.3)}
   .roster .rcard .meta{font-size:11px;color:var(--dim)}
+  .trick{border:1px solid var(--line);border-radius:3px;padding:9px;margin:6px 0;
+    background:rgba(8,15,30,.5);cursor:pointer;transition:border-color .15s}
+  .trick.on{border-color:var(--accent);background:rgba(255,210,63,.08)}
+  .trick .th{display:flex;justify-content:space-between;align-items:center;gap:8px;font-weight:600}
+  .trick .boost{color:var(--good);font-size:12px}
+  .trick .risk{color:var(--bad);font-size:12px}
+  .trick .td{font-size:11px;color:var(--dim);margin-top:4px}
+  .trick .chk{width:18px;height:18px;border:1px solid var(--line);border-radius:3px;flex:none;
+    display:flex;align-items:center;justify-content:center;font-size:12px}
+  .trick.on .chk{background:var(--accent);color:#1a2336;border-color:var(--accent)}
+  .riskline{font-size:13px;text-align:center;margin:8px 0;padding:7px;border:1px solid var(--line);
+    border-radius:3px;color:var(--ink)}
+  .riskline.hot{color:var(--bad);border-color:var(--bad)}
+  .bannedline{font-size:12px;color:var(--bad);margin:4px 0;padding:6px 8px;
+    border-left:2px solid var(--bad);background:rgba(255,90,90,.08)}
   .unit{font-size:16px;color:var(--dim)}
   .ctrl{margin:12px 0 4px;font-size:13px;color:var(--dim)}
   .chk{display:flex;align-items:center;gap:8px;margin-top:10px}
@@ -189,6 +204,8 @@
   <label class="ctrl chk"><input id="aid" type="checkbox" checked> Absprung-Hilfe (Timing-Leiste)</label>
   <label class="ctrl chk"><input id="snd" type="checkbox" checked> Soundeffekte (Wind, Publikum, Glocken)</label>
   <label class="ctrl chk"><input id="comm" type="checkbox" checked> Kommentator Andi Silberberger</label>
+  <label class="ctrl chk"><input id="facts" type="checkbox" checked> Co-Kommentator Bertl (Fun Facts der Orte)</label>
+  <label class="ctrl chk"><input id="clips" type="checkbox"> Eigene Sprachaufnahmen (Ordner audio/)</label>
   <button id="startBtn" class="btn">▶ Schi Heil – los geht's!</button>
   <div class="menurow">
     <button id="installBtn" class="btn ghost hidden">📲 App installieren</button>
@@ -273,6 +290,7 @@
   <div id="chWC" class="rows"></div>
   <button id="chJumpBtn" class="btn">▶ Zum Bewerb</button>
   <div class="menurow">
+    <button id="chTricksBtn" class="btn ghost mini hidden">🤫 Tricks</button>
     <button id="chTrainBtn" class="btn ghost mini">Training</button>
     <button id="chSaveBtn" class="btn ghost mini">Speichern</button>
     <button id="chMenuBtn" class="btn ghost mini">Menü</button>
@@ -289,6 +307,17 @@
   <div id="ctAttrs" class="attrlist"></div>
   <button id="ctRestBtn" class="btn ghost">😴 Erholungstag (+Form, kostet keinen Punkt)</button>
   <button id="ctDoneBtn" class="btn">✓ Training abschließen</button>
+</div>
+
+<!-- ===================== Karriere: Tricks / Hinterzimmer ===================== -->
+<div id="careerTricks" class="board hidden">
+  <div class="eyebrow">Karriere · Hinterzimmer 🤫</div>
+  <h1 id="cxH1">TRICKS</h1>
+  <div class="sub">Verbotene Helferlein für den nächsten Bewerb. Spürbar mehr Weite – aber wennst erwischt wirst, bist gesperrt!</div>
+  <div id="cxWho" class="seg" style="flex-wrap:wrap"></div>
+  <div id="cxList"></div>
+  <div id="cxRisk" class="riskline">Gesamt-Erwischchance: 0 %</div>
+  <button id="cxDoneBtn" class="btn">Übernehmen</button>
 </div>
 
 <!-- ===================== Karriere: Bewerbsergebnis ===================== -->
@@ -337,8 +366,9 @@
    SkiFlug OÖ – Milestone 4 (Karrieremodus)
    M1: Physik · M2: 8 Schanzen + FIS-Wertung + Gyro + Replays
    M3: PWA + Persistenz + Mehrspieler (lokal & WLAN/WebRTC)
-   M4: Karriere – Springer-Attribute (beeinflussen die Physik), Weltcup-
-       Kalender, KI-Welt (~48 Springer), Training, Saisons mit Alterskurve
+   M4: Karriere – Attribute (beeinflussen die Physik), Weltcup, KI-Welt,
+       Training, Saisons, Mehrspieler-Hot-Seat, Co-Kommentator + Fun Facts,
+       Hinterzimmer-Tricks (Anzug/Spezialsaft) mit Erwischen & Sperre
    ===================================================================== */
 const D2R = Math.PI/180, G = 9.81;
 const clamp = (v,a,b)=>Math.max(a,Math.min(b,v));
@@ -470,6 +500,42 @@ const PHYS = {
 /* ====================== Kommentator: Andi Silberberger ======================
    Eigene Figur (kein realer Kommentator). Web Speech API; auf iOS muss die
    Synthese durch die erste Touch-Geste "aufgeweckt" werden.            */
+/* ====================== Eigene Sprachaufnahmen (Clips) ======================
+   Lege Dateien unter  audio/<key>/<key>-01.mp3 , -02.mp3 …  ab.
+   Das Spiel wählt pro Aktion zufällig eine Variante. Fehlt eine Datei oder ist
+   der Schalter aus, wird automatisch die Gerätestimme (TTS) genutzt.
+   Trage in AUDIO_MANIFEST ein, WIE VIELE Varianten du je Aktion aufgenommen hast. */
+const AUDIO_MANIFEST = {
+  // Kommentator (Andi)
+  start:8, takeoffPerfect:8, takeoffGood:6, takeoffPoor:6,
+  flightHigh:8, flightLow:6, overK:8, overHS:8,
+  telemark:6, landOk:6, crash:8, record:8,
+  win:6, podium:5, caught:6,
+  // Co-Kommentator Fun Facts je Schanze (fact_<hillId>)
+  fact_schaerding:3, fact_freistadt:3, fact_hinzenbach:3, fact_poestlingberg:3,
+  fact_steyr:3, fact_badischl:3, fact_windischgarsten:3, fact_obertraun:3
+};
+const Clips = {
+  on:false,                 // Nutzer-Schalter (Einstellungen) – an, sobald du Dateien hast
+  base:"audio/",
+  manifest:AUDIO_MANIFEST,
+  has(key){ return this.on && (this.manifest[key]||0)>0; },
+  unlock(){ /* iOS: stummen Clip nach erster Geste anstoßen */
+    if (!this.on) return;
+    try{ const a=new Audio(); a.muted=true; a.play().catch(()=>{}); }catch(e){}
+  },
+  play(key,onFail){
+    const n=this.manifest[key]||0;
+    if (!this.on || !n){ onFail&&onFail(); return; }
+    const i=1+Math.floor(Math.random()*n);
+    const url=this.base+key+"/"+key+"-"+String(i).padStart(2,"0")+".mp3";
+    let done=false; const fail=()=>{ if(done)return; done=true; onFail&&onFail(); };
+    try{ const a=new Audio(url); a.onerror=fail;
+      const p=a.play(); if (p&&p.catch) p.catch(fail);
+    }catch(e){ fail(); }
+  }
+};
+
 const Andi = {
   on:true, ready:false, voice:null, last:0, lastLine:"",
   // Satz-Pool je Ereignis – österreichisch-euphorisch
@@ -485,7 +551,10 @@ const Andi = {
     telemark:["Und der Telemark sitzt — bilderbuchmäßig, bravo!","Sauba gstellt, perfekt glandet, traumhaft!","Mustergültig owe, do gibt's die Topnoten!"],
     landOk:["Glandet is glandet, weiter geht's!","Auf beide Ski owe — des zählt amoi!","Najo, ka Telemark, aber gstandn is er!"],
     crash:["Oje oje, do hot's eahm zaumghaut!","Sturz! Des tuat weh beim bloßen Zuaschaun!","Geh, do is er glegn — aufstehn, weiter geht's!","Uiuiui, des is goar nia guat ausgangen!"],
-    record:["Schanzenrekord — i wir narrisch do herobn!","Bestweite, sensationell, des is ja leiwand!","Neue Bestmarke — heast, des feiern ma mit am Most!","Rekord — ganz Oberösterreich steht Kopf!"]
+    record:["Schanzenrekord — i wir narrisch do herobn!","Bestweite, sensationell, des is ja leiwand!","Neue Bestmarke — heast, des feiern ma mit am Most!","Rekord — ganz Oberösterreich steht Kopf!"],
+    win:["Der Sieg! Heast, des is sensationell, owe vom Balken zum Stockerl ganz obn!","Gwonnen, gwonnen, gwonnen — wos für a Leistung!","Der hot's gholt, der Bewerbssieg geht nach do!"],
+    podium:["Aufs Stockerl! A Podestplatz, des passt scho fein!","Unter die ersten Drei — bravo, des is a starke Leistung!","Podest, des is a Grund zum Feiern!"],
+    caught:["Oje, do hot da Materialkontrolleur wos gfunden — disqualifiziert!","Erwischt! Der Anzug woar z'groß, des gibt a Sperre!","Heast, des is jetzt ärgerlich — Disqualifikation und Sperre dazua!"]
   },
   // manche Ereignisse mit einem kurzen "Doppler" für mehr Schmäh
   followups:{ overHS:["Heast!","Unglaublich!","I fass es net!"],
@@ -515,28 +584,110 @@ const Andi = {
     try{ speechSynthesis.speak(u); }catch(e){}
   },
   say(key,{force=false,prio=false}={}){
-    if (!this.on || !("speechSynthesis" in window)) return;
+    if (!this.on) return;
     const now=performance.now();
     if (!force && now-this.last<1300) return;                  // nicht überreden
+    this.last=now;
+    // 1) Eigene Aufnahme bevorzugen, sonst auf TTS zurückfallen
+    if (Clips.has(key)){
+      if (prio && "speechSynthesis" in window) speechSynthesis.cancel();
+      Clips.play(key, ()=>this._tts(key,prio));
+      return;
+    }
+    this._tts(key,prio);
+  },
+  _tts(key,prio){
+    if (!("speechSynthesis" in window)) return;
     const line=this.pick(key); if(!line) return;
     if (prio) speechSynthesis.cancel();
-    // Grund-Energie hoch; Höhepunkte schneller & höher
     let rate=1.2, pitch=1.12;
-    const hype = (key==="overHS"||key==="record");
+    const hype = (key==="overHS"||key==="record"||key==="win");
     if (hype){ rate=1.32; pitch=1.22; }
-    else if (key==="takeoffPerfect"||key==="overK"||key==="flightHigh"){ rate=1.26; pitch=1.18; }
-    else if (key==="crash"){ rate=1.22; pitch=0.96; }
+    else if (key==="takeoffPerfect"||key==="overK"||key==="flightHigh"||key==="podium"){ rate=1.26; pitch=1.18; }
+    else if (key==="crash"||key==="caught"){ rate=1.22; pitch=0.96; }
     this.utter(line,rate,pitch);
-    // optionaler kurzer Nachsatz für Schmäh
     const fu=this.followups[key];
     if (fu && (hype || Math.random()<0.4))
       this.utter(fu[(Math.random()*fu.length)|0], rate+0.06, pitch+0.05);
-    this.last=now;
   }
 };
 if ("speechSynthesis" in window){
-  speechSynthesis.onvoiceschanged=()=>Andi.pickVoice();
+  speechSynthesis.onvoiceschanged=()=>{ Andi.pickVoice(); Bertl.pickVoice(); };
   Andi.pickVoice();
+}
+
+/* ====================== Co-Kommentator "Bertl" + Fun Facts ======================
+   Frei erfundene Figur (Bertl Moosleitner), ruhiger Experte – NICHT Goldberger.
+   Steuert Fun Facts zu den Austragungsorten bei. Eigene, tiefere TTS-Stimme.     */
+const FACTS = {
+  schaerding:["Schärding am Inn ist berühmt für seine bunte Barock-Häuserzeile, die Silberzeile.",
+    "Die Altstadt von Schärding gehörte einst den bayerischen Herzögen — man sieht's an den Fassaden.",
+    "Schärding ist als Kurort mit der Bäderzeile bekannt."],
+  freistadt:["Freistadt im Mühlviertel hat eine fast vollständig erhaltene mittelalterliche Stadtmauer.",
+    "Das Freistädter Bier wird in einer der wenigen Bürgerbrauereien gebraut, die der Stadt selbst gehört.",
+    "Freistadt war im Mittelalter ein wichtiger Handelsplatz an der Salzstraße nach Böhmen."],
+  hinzenbach:["In Hinzenbach bei Eferding steht eine der bekanntesten Nachwuchs-Schanzen Österreichs.",
+    "Eferding zählt zu den ältesten Städten Österreichs und ist fürs Gemüse, besonders Gurken, bekannt.",
+    "Die Schanze in Hinzenbach ist regelmäßig Schauplatz von Continental-Cup-Bewerben."],
+  poestlingberg:["Der Pöstlingberg ist Linz' Hausberg — hinauf fährt eine der steilsten Bergbahnen Europas.",
+    "Oben thront die Wallfahrtsbasilika, das Wahrzeichen von Linz.",
+    "Im Berg versteckt sich die Grottenbahn mit ihrem Drachen Lavalava."],
+  steyr:["Steyr gilt als eine der schönsten Eisenstädte und war Zentrum der Eisenverarbeitung.",
+    "In Steyr liegt Christkindl — von dort verschickt das berühmte Weihnachtspostamt Briefe in alle Welt.",
+    "Der Stadtplatz von Steyr zählt zu den prächtigsten Plätzen Österreichs."],
+  badischl:["Bad Ischl war die kaiserliche Sommerresidenz — die Kaiservilla zog den ganzen Hof ins Salzkammergut.",
+    "Die berühmte Konditorei Zauner machte Bad Ischl zur süßen Hauptstadt der Monarchie.",
+    "2024 war Bad Ischl mit dem Salzkammergut Kulturhauptstadt Europas."],
+  windischgarsten:["Windischgarsten liegt mitten im Nationalpark Kalkalpen, einem riesigen Buchen-Urwald.",
+    "Die Region rund um den Pyhrnpass ist ein altes Pass- und Handelsgebiet.",
+    "Vom Hochbuchberg hat man einen Traumblick aufs Tote Gebirge."],
+  obertraun:["Obertraun liegt am Hallstätter See — der Dachstein mit seiner Eishöhle ragt direkt darüber auf.",
+    "Die Region Hallstatt-Dachstein ist UNESCO-Welterbe und uralte Salzabbau-Gegend.",
+    "Auf den Dachstein führt die Krippenstein-Seilbahn hinauf zum berühmten 5fingers-Aussichtssteg."]
+};
+const Bertl = {
+  on:true, voice:null, last:0, lastFact:"",
+  pickVoice(){
+    if (!("speechSynthesis" in window)) return;
+    const vs=speechSynthesis.getVoices();
+    // bewusst eine ANDERE Stimme als Andi (zweiter Sprecher)
+    const cand = vs.filter(v=>/de/i.test(v.lang) && v!==Andi.voice);
+    this.voice = cand.find(v=>/de[-_]AT/i.test(v.lang))
+             || cand.find(v=>/Markus|Conrad|Stefan|Yannick/i.test(v.name))
+             || cand[0] || Andi.voice || null;
+  },
+  factFor(hillId){
+    const a=FACTS[hillId]; if(!a||!a.length) return null;
+    let s; for(let i=0;i<4;i++){ s=a[(Math.random()*a.length)|0]; if(s!==this.lastFact) break; }
+    this.lastFact=s; return s;
+  },
+  sayFact(hillId,intro){
+    if (!this.on) return;
+    this.last=performance.now();
+    const key="fact_"+hillId;
+    if (Clips.has(key)){ Clips.play(key, ()=>this._ttsFact(hillId,intro)); return; }
+    this._ttsFact(hillId,intro);
+  },
+  _ttsFact(hillId,intro){
+    if (!("speechSynthesis" in window)) return;
+    const fact=this.factFor(hillId); if(!fact) return;
+    const text=(intro?intro+" ":"")+fact;
+    try{
+      const u=new SpeechSynthesisUtterance(text);
+      if (this.voice) u.voice=this.voice;
+      u.lang=this.voice?this.voice.lang:"de-DE";
+      u.rate=1.0; u.pitch=0.9; u.volume=1;     // ruhiger, tiefer als Andi
+      speechSynthesis.speak(u);
+    }catch(e){}
+  }
+};
+let _lastFactHill=null;
+function maybeFunFact(hillId,intro){
+  if (!Bertl.on) return;
+  if (hillId===_lastFactHill) return;           // pro Schanze nur einmal
+  _lastFactHill=hillId;
+  // kurz verzögert, damit Andis Startruf nicht überlappt
+  setTimeout(()=>Bertl.sayFact(hillId,intro), 1600);
 }
 
 /* ====================== Sound-Engine (Web Audio, prozedural, eingebettet) ======================
@@ -788,16 +939,37 @@ function aiJump(rng,hill,j){
   const stylePts=style*3;
   return { dist, crashed, total: crashed? distPts*0.3+stylePts : distPts+stylePts };
 }
+// "Hinterzimmer"-Optionen (fiktiv) – mittleres Risiko, ab 3 Bewerben freigeschaltet
+const TRICKS = {
+  suit:  { name:"Übergroßer Anzug", icon:"🧥",
+    desc:"Mehr Stoff = mehr Auftrieb. Der Materialkontrolleur schaut aber genau hin.",
+    boost:"+10 % Auftrieb", catch:0.28,
+    apply:m=>{ m.flightMul+=0.10; } },
+  doc:   { name:"Spezialsaft vom Vereinsarzt", icon:"💉",
+    desc:"Ein dubioses Mittel vom Materialwart – kurz hebt's alle Werte, ist aber heikel.",
+    boost:"+2 auf alle Attribute", catch:0.22,
+    apply:m=>{ m.powerMul+=0.06; m.flightMul+=0.05; m.windResist*=0.85;
+               m.flareWindow+=0.10; m.nervesVar=Math.max(0,m.nervesVar-0.05); } },
+  wax:   { name:"Wundersaft auf die Ski", icon:"🪄",
+    desc:"Eine geheime Wachsmischung für Extra-Speed am Anlauf. Riskant, wenn's auffliegt.",
+    boost:"+6 % Anlauf-Speed", catch:0.20,
+    apply:m=>{ m.powerMul+=0.07; } }
+};
+function tricksUnlocked(){ return career.season>1 || career.eventIdx>=3; }
 // Attribut-Modifikatoren für den Spieler-Sprung (greifen in die Physik)
 function playerMods(){
   const a=career.player.attrs, f=career.player.form;
-  return {
+  const m={
     powerMul: 0.90 + 0.20*nrm(a.power) + (f-0.5)*0.05,
     flightMul:0.94 + 0.12*nrm(a.flight) + (f-0.5)*0.04,
     windResist:1 - 0.32*nrm(a.stability),
     flareWindow:0.5 + 0.5*nrm(a.telemark),
     nervesVar:(1-nrm(a.nerves))*0.18
   };
+  // aktive Tricks des aktuellen Menschen anwenden
+  const t=career.player._tricks;
+  if (t){ for(const key in TRICKS) if (t[key]) TRICKS[key].apply(m); }
+  return m;
 }
 function awardWC(ranking){
   ranking.forEach((e,i)=>{ if(i<30){ career.wc[e.id]=(career.wc[e.id]||0)+WC_POINTS[i]; } });
@@ -1510,7 +1682,7 @@ const $=id=>document.getElementById(id);
 const windChip=$("windChip"), speedChip=$("speedChip"),
       hintEl=$("hint"), toast=$("toast"),
       menu=$("menu"), result=$("result"),
-      sensEl=$("sens"), aidEl=$("aid"), commEl=$("comm"), sndEl=$("snd");
+      sensEl=$("sens"), aidEl=$("aid"), commEl=$("comm"), sndEl=$("snd"), factsEl=$("facts"), clipsEl=$("clips");
 let hintUntil=0, toastUntil=0;
 function setHint(t,sec){ if(!t){hintEl.classList.add("hidden");return;}
   hintEl.textContent=t; hintEl.classList.remove("hidden");
@@ -1600,6 +1772,7 @@ function newJump(){
             "Warte … und tippe GENAU an der Tischkante!",4);
   }
   Andi.say("start",{prio:true,force:true});
+  maybeFunFact(CUR.id);
   Snd.gate();
 }
 function startReplay(data){
@@ -1777,7 +1950,7 @@ const Store = {
 };
 function snapshot(){
   return { v:3, bests, bestScores,
-    settings:{ sens:sensEl.value, snd:sndEl.checked, comm:commEl.checked, aid:aidEl.checked, controlMode },
+    settings:{ sens:sensEl.value, snd:sndEl.checked, comm:commEl.checked, facts:factsEl.checked, clips:clipsEl.checked, aid:aidEl.checked, controlMode },
     replays };
 }
 function saveState(){ Store.set("state", snapshot()); }
@@ -1792,6 +1965,8 @@ async function loadState(){
   if (st.sens){ sensEl.value=st.sens; $("sensVal").textContent=st.sens; }
   if ("snd" in st){ sndEl.checked=st.snd; Snd.on=st.snd; }
   if ("comm" in st){ commEl.checked=st.comm; Andi.on=st.comm; }
+  if ("facts" in st){ factsEl.checked=st.facts; Bertl.on=st.facts; }
+  if ("clips" in st){ clipsEl.checked=st.clips; Clips.on=st.clips; }
   if ("aid" in st){ aidEl.checked=st.aid; }
   if (st.controlMode) controlMode=st.controlMode;
 }
@@ -1906,7 +2081,7 @@ function setMode(mode){
 
 /* ====================== KARRIERE: UI & Ablauf ====================== */
 function hideAllBoards(){ ["menu","result","standings","netMenu","careerCreate",
-  "careerHub","careerTrain","careerEventRes","careerSeasonEnd"].forEach(id=>$(id).classList.add("hidden")); }
+  "careerHub","careerTrain","careerTricks","careerEventRes","careerSeasonEnd"].forEach(id=>$(id).classList.add("hidden")); }
 function attrBar(k,val){ return '<div class="attrrow"><span class="nm">'+ATTR_NAMES[k]+
   '</span><div class="bar"><i style="width:'+(val*10)+'%"></i></div><span class="val">'+val+'</span></div>'; }
 
@@ -2068,6 +2243,17 @@ function openCareerHub(){
     const me=humanIds.has(e.j.id)?" me":""; const ld=i===0?" lead":"";
     return '<div class="r'+me+ld+'"><span><span class="rank">'+(i+1)+'.</span>'+e.j.name+'</span><b>'+e.pts+'</b></div>';
   }).join("");
+  // Tricks-Button erst nach Freischaltung
+  $("chTricksBtn").classList.toggle("hidden", !(ev && tricksUnlocked()));
+  // Sperren-Hinweis (wer beim letzten Bewerb erwischt wurde)
+  const banned=career.humans.filter(h=>h._banEventIdx===career.eventIdx);
+  let banEl=$("chBan");
+  if (banned.length && ev){
+    if (!banEl){ banEl=document.createElement("div"); banEl.id="chBan"; banEl.className="bannedline";
+      $("chNext").after(banEl); }
+    banEl.style.display="block";
+    banEl.innerHTML="🚫 gesperrt für diesen Bewerb: <b>"+banned.map(h=>h.name).join(", ")+"</b>";
+  } else if (banEl){ banEl.style.display="none"; }
   $("careerHub").classList.remove("hidden");
 }
 // ---- Bewerb starten: alle Menschen springen reihum ----
@@ -2075,10 +2261,28 @@ function startCareerEvent(){
   const ev=career.calendar[career.eventIdx]; if(!ev) return;
   career.inEvent=true;
   career.eventScores={};
-  for(const h of career.humans) career.eventScores[h.id]={tot:0,best:0,jumps:[]};
+  for(const h of career.humans){
+    const banned = h._banEventIdx===career.eventIdx;
+    career.eventScores[h.id]={tot:0,best:0,jumps:[],banned};
+  }
   CUR=HILLS[ev.hillId];
   career.evHumanIdx=0;
-  beginHumanTurn(true);
+  _lastFactHill=null;                          // Fun Fact je Bewerb neu
+  const intro = ev.final?"Skiflug-Finale in Obertraun!":ev.tournee?"Station der OÖ-Tournee.":"Weltcup in Oberösterreich.";
+  maybeFunFact(ev.hillId, intro);
+  advanceToNextJumper(true);
+}
+// nächsten nicht-gesperrten Menschen finden (oder auswerten)
+function advanceToNextJumper(first){
+  while(career.evHumanIdx<career.humans.length){
+    const h=career.humans[career.evHumanIdx];
+    if (h._banEventIdx===career.eventIdx){      // gesperrt -> sitzt aus
+      setHint("🚫 "+h.name+" ist gesperrt und setzt diesen Bewerb aus.",2.5);
+      career.evHumanIdx++; continue;
+    }
+    beginHumanTurn(first); return;
+  }
+  evaluateCareerEvent();                        // niemand (mehr) übrig
 }
 function beginHumanTurn(first){
   const h=career.humans[career.evHumanIdx];
@@ -2089,7 +2293,10 @@ function beginHumanTurn(first){
   career.mod=playerMods();
   hideAllBoards();
   careerNewJump();
-  if (MP()){
+  // Hinweis auf aktive Tricks
+  const activeTricks=h._tricks?Object.keys(TRICKS).filter(k=>h._tricks[k]):[];
+  if (activeTricks.length) setHint("🤫 "+h.name+" mit "+activeTricks.map(k=>TRICKS[k].icon).join("")+" – riskant!",3.5);
+  else if (MP()){
     const msg = first&&career.evHumanIdx===0 ? h.name+" beginnt – an der Kante tippen!"
       : "➡ Gerät an "+h.name+" weitergeben – dann tippen!";
     setHint(msg,4);
@@ -2114,9 +2321,12 @@ function finishCareerJump(){
   ps.tot+=pts; ps.best=Math.max(ps.best,game.dist); ps.jumps.push({pts,dist:game.dist});
   const ev=career.calendar[career.eventIdx];
   const lastRound=career.eventRound>=ev.rounds-1;
-  const lastHuman=career.evHumanIdx>=career.humans.length-1;
+  // gibt es nach diesem Menschen noch einen weiteren (nicht gesperrten)?
+  let moreHumans=false;
+  for(let i=career.evHumanIdx+1;i<career.humans.length;i++)
+    if (career.humans[i]._banEventIdx!==career.eventIdx){ moreHumans=true; break; }
   $("again").textContent = !lastRound ? "Nächster Durchgang"
-    : (lastHuman ? "Bewerb auswerten" : "Nächster Springer →");
+    : (moreHumans ? "Nächster Springer →" : "Bewerb auswerten");
 }
 function careerAfterJump(){
   saveCareer();
@@ -2124,10 +2334,9 @@ function careerAfterJump(){
   result.classList.add("hidden");
   career.eventRound++;
   if (career.eventRound<ev.rounds){ careerNewJump(); return; }
-  // dieser Mensch fertig -> nächster Mensch oder auswerten
+  // dieser Mensch fertig -> nächster (nicht gesperrter) Mensch oder auswerten
   career.evHumanIdx++;
-  if (career.evHumanIdx<career.humans.length){ beginHumanTurn(false); return; }
-  evaluateCareerEvent();
+  advanceToNextJumper(false);
 }
 function evaluateCareerEvent(){
   const ev=career.calendar[career.eventIdx]; const hill=HILL_DEFS[ev.hillId];
@@ -2135,8 +2344,23 @@ function evaluateCareerEvent(){
   for(const j of career.world) j.form=clamp(0.5+(rng()*0.5-0.25),0.15,1);
   const field=[];
   const humanIds=new Set(career.humans.map(h=>h.id));
-  for(const h of career.humans){ const es=career.eventScores[h.id];
-    field.push({id:h.id,name:h.name,tot:es.tot,best:es.best,me:true}); }
+  const caught=[];      // Menschen, die erwischt wurden (DSQ + Sperre)
+  for(const h of career.humans){
+    const es=career.eventScores[h.id];
+    if (es.banned){ h._lastDSQ=false; continue; }   // war gesperrt -> nicht im Feld
+    // Erwischen?
+    const trickKey = rollTrickCatch(h);
+    if (trickKey){
+      caught.push({h, trick:TRICKS[trickKey]});
+      h._banEventIdx = career.eventIdx+1;            // 1 Bewerb Sperre (nächster)
+      h._lastDSQ=true;
+      // DSQ: kein Eintrag im Wertungsfeld (0 Punkte)
+    } else {
+      h._lastDSQ=false;
+      field.push({id:h.id,name:h.name,tot:es.tot,best:es.best,me:true});
+    }
+    if (h._tricks) h._tricks={};                     // Tricks gelten nur für diesen Bewerb
+  }
   for(const j of career.world){
     let tot=0,best=0;
     for(let r=0;r<ev.rounds;r++){ const res=aiJump(rng,hill,j); tot+=res.total; best=Math.max(best,res.dist); }
@@ -2144,15 +2368,17 @@ function evaluateCareerEvent(){
   }
   field.sort((a,b)=>b.tot-a.tot);
   awardWC(field);
-  // Statistik je Mensch
+  // Statistik je Mensch (nur wer gewertet wurde)
   for(const h of career.humans){
+    const es=career.eventScores[h.id];
+    if (es.banned || h._lastDSQ){ h._lastPlace=999; h._lastGain=0; continue; }
     const place=field.findIndex(f=>f.id===h.id)+1;
     const gained=place<=30?WC_POINTS[place-1]:0;
     const st=h.stats;
     st.starts++; st.sStarts++; st.careerPts+=gained;
     if (place===1){ st.wins++; st.sWins++; }
     if (place<=3){ st.podiums++; st.sPodiums++; }
-    st.bestJump=Math.max(st.bestJump, career.eventScores[h.id].best);
+    st.bestJump=Math.max(st.bestJump, es.best);
     h.form=clamp(h.form+0.06,0.15,1);
     h._lastPlace=place; h._lastGain=gained;
   }
@@ -2160,36 +2386,59 @@ function evaluateCareerEvent(){
   let bestHuman=career.humans[0], bestPlace=999;
   for(const h of career.humans){ if (h._lastPlace<bestPlace){ bestPlace=h._lastPlace; bestHuman=h; } }
   career.lastResult={ hill:hill.name.split(" · ")[0], place:bestPlace, gained:bestHuman._lastGain,
-    dist:career.eventScores[bestHuman.id].best };
+    dist:(career.eventScores[bestHuman.id]||{}).best||0 };
   hideAllBoards();
   $("ceEye").textContent=hill.name.split(" · ")[0]+" · "+(ev.final?"Skiflug-Finale":ev.tournee?"OÖ-Tournee":"Weltcup");
+  // Erwischt-Banner
+  let caughtHtml="";
+  if (caught.length){
+    caughtHtml='<div class="bannedline" style="border-color:var(--bad)">⚠ Erwischt: '
+      + caught.map(c=>'<b>'+c.h.name+'</b> ('+c.trick.icon+' '+c.trick.name+')').join(", ")
+      + ' → disqualifiziert &amp; nächster Bewerb gesperrt!</div>';
+    Andi.say("caught",{prio:true,force:true});
+  }
   if (MP()){
     $("ceTitle").textContent="ERGEBNIS";
-    $("cePlace").textContent=bestPlace+".";
+    $("cePlace").textContent= bestPlace<999?bestPlace+".":"–";
     $("cePts").textContent=bestHuman.name.split(" ")[0];
-    // alle Menschen mit Platz auflisten + Top 3 Gesamt
-    const human=career.humans.map(h=>({h,place:field.findIndex(f=>f.id===h.id)+1}))
-      .sort((a,b)=>a.place-b.place);
-    let html=human.map(x=>'<div class="r me"><span><span class="rank">'+x.place+'.</span>'+x.h.name
-      +'</span><b>+'+(x.place<=30?WC_POINTS[x.place-1]:0)+' WC · '+career.eventScores[x.h.id].best.toFixed(1)+'m</b></div>').join("");
+    const human=career.humans.map(h=>({h,place:h._lastDSQ?"DSQ":(career.eventScores[h.id].banned?"GES.":field.findIndex(f=>f.id===h.id)+1)}))
+      .sort((a,b)=>(a.place==="DSQ"||a.place==="GES."?999:a.place)-(b.place==="DSQ"||b.place==="GES."?999:b.place));
+    let html=caughtHtml+human.map(x=>{
+      const pts=(typeof x.place==="number"&&x.place<=30)?WC_POINTS[x.place-1]:0;
+      const lbl=(x.place==="DSQ")?"🚫 DSQ":(x.place==="GES.")?"gesperrt":x.place+".";
+      return '<div class="r me"><span><span class="rank">'+lbl+'</span>'+x.h.name
+        +'</span><b>+'+pts+' WC · '+career.eventScores[x.h.id].best.toFixed(1)+'m</b></div>';
+    }).join("");
     html+='<div class="r" style="opacity:.6;margin-top:4px"><span>— Bewerbs-Podest —</span><b></b></div>';
     html+=field.slice(0,3).map((f,i)=>'<div class="r'+(i===0?" lead":"")+(humanIds.has(f.id)?" me":"")
       +'"><span><span class="rank">'+["🥇","🥈","🥉"][i]+'</span>'+f.name+'</span><b>'+f.tot.toFixed(1)+'</b></div>').join("");
     $("ceList").innerHTML=html;
   } else {
-    const h=career.humans[0]; const place=h._lastPlace, gained=h._lastGain;
-    $("ceTitle").textContent= place===1?"🥇 SIEG!":place<=3?"🏆 PODEST!":"Platz "+place;
-    $("cePlace").textContent=place+".";
-    $("cePts").textContent="+"+gained+" WC";
-    $("ceList").innerHTML=field.slice(0,8).map((f,i)=>{
-      const me=humanIds.has(f.id)?" me":""; const ld=i===0?" lead":"";
-      return '<div class="r'+me+ld+'"><span><span class="rank">'+(i+1)+'.</span>'+f.name+'</span><b>'+f.tot.toFixed(1)+' · '+f.best.toFixed(1)+'m</b></div>';
-    }).join("") + (place>8?'<div class="r me"><span><span class="rank">'+place+'.</span>'+h.name+'</span><b>'+career.eventScores[h.id].tot.toFixed(1)+'</b></div>':'');
+    const h=career.humans[0];
+    if (h._lastDSQ){
+      $("ceTitle").textContent="🚫 DISQUALIFIZIERT";
+      $("cePlace").textContent="DSQ";
+      $("cePts").textContent="0 WC";
+      $("ceList").innerHTML=caughtHtml+field.slice(0,5).map((f,i)=>
+        '<div class="r'+(i===0?" lead":"")+'"><span><span class="rank">'+(i+1)+'.</span>'+f.name+'</span><b>'+f.tot.toFixed(1)+'m</b></div>').join("");
+    } else {
+      const place=h._lastPlace, gained=h._lastGain;
+      $("ceTitle").textContent= place===1?"🥇 SIEG!":place<=3?"🏆 PODEST!":"Platz "+place;
+      $("cePlace").textContent=place+".";
+      $("cePts").textContent="+"+gained+" WC";
+      $("ceList").innerHTML=field.slice(0,8).map((f,i)=>{
+        const me=humanIds.has(f.id)?" me":""; const ld=i===0?" lead":"";
+        return '<div class="r'+me+ld+'"><span><span class="rank">'+(i+1)+'.</span>'+f.name+'</span><b>'+f.tot.toFixed(1)+' · '+f.best.toFixed(1)+'m</b></div>';
+      }).join("") + (place>8?'<div class="r me"><span><span class="rank">'+place+'.</span>'+h.name+'</span><b>'+career.eventScores[h.id].tot.toFixed(1)+'</b></div>':'');
+    }
   }
   career.inEvent=false; career.mod=null; career.player=null;
   career.eventIdx++;
   saveCareer();
-  if (bestPlace===1){ Andi.say("record",{prio:true,force:true}); Snd.cheer(true); }
+  if (!caught.length){
+    if (bestPlace===1){ Andi.say("win",{prio:true,force:true}); Snd.cheer(true); }
+    else if (bestPlace<=3){ Andi.say("podium",{prio:true,force:true}); Snd.cheer(true); }
+  }
   $("careerEventRes").classList.remove("hidden");
 }
 function afterCareerEvent(){
@@ -2245,6 +2494,59 @@ function restDay(){
   h.form=clamp(h.form+0.12,0.15,1);
   setHint("Erholt! Form jetzt "+Math.round(h.form*100)+"%",2);
   renderTrainAttrs();
+}
+// ---- Tricks / Hinterzimmer ----
+let cxWhoIdx=0;
+function openTricks(){
+  hideAllBoards();
+  cxWhoIdx=0;
+  const who=$("cxWho");
+  if (MP()){
+    who.style.display="flex";
+    who.innerHTML=career.humans.map((h,i)=>
+      '<button class="segbtn'+(i===0?" active":"")+'" data-i="'+i+'">'+h.name.split(" ")[0]+'</button>').join("");
+    who.querySelectorAll(".segbtn").forEach(b=>b.addEventListener("click",e=>{ e.stopPropagation();
+      cxWhoIdx=Number(b.dataset.i);
+      who.querySelectorAll(".segbtn").forEach(x=>x.classList.toggle("active",x===b));
+      renderTricks(); }));
+  } else { who.style.display="none"; who.innerHTML=""; }
+  // aktuelle Tricks-Auswahl je Mensch initialisieren
+  for(const h of career.humans){ if(!h._tricks) h._tricks={}; }
+  renderTricks();
+  $("careerTricks").classList.remove("hidden");
+}
+function curTrickster(){ return career.humans[cxWhoIdx]; }
+function renderTricks(){
+  const h=curTrickster();
+  $("cxH1").textContent= MP()? ("TRICKS · "+h.name.split(" ")[0]) : "TRICKS";
+  const box=$("cxList"); box.innerHTML="";
+  for(const key in TRICKS){
+    const t=TRICKS[key]; const on=!!(h._tricks&&h._tricks[key]);
+    const card=document.createElement("div"); card.className="trick"+(on?" on":"");
+    card.innerHTML='<div class="th"><span>'+t.icon+' '+t.name+'</span>'
+      +'<span class="chk">'+(on?'✓':'')+'</span></div>'
+      +'<div class="th"><span class="boost">'+t.boost+'</span>'
+      +'<span class="risk">Erwischchance '+Math.round(t.catch*100)+' %</span></div>'
+      +'<div class="td">'+t.desc+'</div>';
+    card.addEventListener("click",e=>{ e.stopPropagation();
+      h._tricks[key]=!h._tricks[key]; renderTricks(); });
+    box.appendChild(card);
+  }
+  // Gesamtrisiko (mind. einer erwischt) = 1 - Π(1 - p)
+  let pNone=1, any=false;
+  for(const key in TRICKS) if (h._tricks[key]){ pNone*=(1-TRICKS[key].catch); any=true; }
+  const risk=any?(1-pNone):0;
+  const rl=$("cxRisk");
+  rl.textContent="Gesamt-Erwischchance: "+Math.round(risk*100)+" %"+(any?" · bei Erwischen 1 Bewerb Sperre":"");
+  rl.className="riskline"+(risk>=0.4?" hot":"");
+}
+// Erwischen würfeln (am Bewerbsende, je Mensch)
+function rollTrickCatch(h){
+  if (!h._tricks) return false;
+  for(const key in TRICKS){
+    if (h._tricks[key] && Math.random()<TRICKS[key].catch) return key;
+  }
+  return false;
 }
 // ---- Saisonende ----
 function openSeasonEnd(){
@@ -2304,14 +2606,26 @@ let leanId=null, lastX=0, lastY=0, downT=0, moved=0;
 sensEl.addEventListener("input",()=>{$("sensVal").textContent=sensEl.value;});
 commEl.addEventListener("change",()=>{ Andi.on=commEl.checked;
   if (!Andi.on && "speechSynthesis" in window) speechSynthesis.cancel(); });
+factsEl.addEventListener("change",()=>{ Bertl.on=factsEl.checked;
+  if (!Bertl.on && "speechSynthesis" in window) speechSynthesis.cancel(); });
+clipsEl.addEventListener("change",()=>{ Clips.on=clipsEl.checked; Clips.unlock(); });
 sndEl.addEventListener("change",()=>{ Snd.on=sndEl.checked;
   if (Snd.ready) Snd.setWind(0,false); });
 // iOS: Sprachsynthese erst nach erster Nutzergeste freischalten
-addEventListener("pointerdown",()=>{ Andi.unlock(); Snd.unlock(); },{once:true,capture:true});
+addEventListener("pointerdown",()=>{ Andi.unlock(); Bertl.pickVoice(); Clips.unlock(); Snd.unlock(); },{once:true,capture:true});
 function degPerPx(){ return 0.07*Number(sensEl.value); }
 
 const stage=document.getElementById("stage");
+function boardOpen(){
+  for (const id of ["menu","careerCreate","careerHub","careerTrain","careerEventRes",
+    "careerSeasonEnd","netMenu","standings","result"]){
+    const el=document.getElementById(id);
+    if (el && !el.classList.contains("hidden")) return true;
+  }
+  return false;
+}
 stage.addEventListener("pointerdown",e=>{
+  if (boardOpen()) return;                   // kein Sprung, solange ein Panel offen ist
   e.preventDefault();
   if (replay) return;                       // im Replay keine Eingabe
   if (game.state==="inrun"){ takeoffTap(); leanId=e.pointerId;
@@ -2367,7 +2681,7 @@ $("stMenuBtn").addEventListener("click",e=>{ e.stopPropagation();
   compReset(); $("standings").classList.add("hidden"); menu.classList.remove("hidden"); });
 
 // ---- Karriere-Buttons ----
-["careerCreate","careerHub","careerTrain","careerEventRes","careerSeasonEnd"].forEach(id=>
+["careerCreate","careerHub","careerTrain","careerTricks","careerEventRes","careerSeasonEnd"].forEach(id=>
   $(id).addEventListener("pointerdown",e=>e.stopPropagation()));
 $("ccDice").addEventListener("click",e=>{ e.stopPropagation();
   ccDraft.name=OOE.randName(); ccDraft.home=OOE.randOrt();
@@ -2379,6 +2693,8 @@ $("ccBackBtn").addEventListener("click",e=>{ e.stopPropagation();
   hideAllBoards(); setMode("single"); menu.classList.remove("hidden"); });
 $("chJumpBtn").addEventListener("click",e=>{ e.stopPropagation(); startCareerEvent(); });
 $("chTrainBtn").addEventListener("click",e=>{ e.stopPropagation(); openTraining(); });
+$("chTricksBtn").addEventListener("click",e=>{ e.stopPropagation(); openTricks(); });
+$("cxDoneBtn").addEventListener("click",e=>{ e.stopPropagation(); saveCareer(); openCareerHub(); });
 $("chSaveBtn").addEventListener("click",e=>{ e.stopPropagation(); saveCareer(); setHint("Karriere gespeichert!",2); });
 $("chMenuBtn").addEventListener("click",e=>{ e.stopPropagation();
   hideAllBoards(); setMode("single"); menu.classList.remove("hidden"); });
@@ -2478,7 +2794,19 @@ function advanceFromRemote(){
 }
 
 const keys={};
+function typingInField(e){
+  const t=e.target;
+  if (t && (t.tagName==="INPUT"||t.tagName==="TEXTAREA"||t.tagName==="SELECT"||t.isContentEditable)) return true;
+  // Auch wenn ein Menü-/Setup-Screen offen ist, keine Spielsteuerung per Tastatur
+  for (const id of ["menu","careerCreate","careerHub","careerTrain","careerEventRes",
+    "careerSeasonEnd","netMenu","standings"]){
+    const el=document.getElementById(id);
+    if (el && !el.classList.contains("hidden")) return true;
+  }
+  return false;
+}
 addEventListener("keydown",e=>{
+  if (typingInField(e)) return;            // beim Tippen NICHT springen
   keys[e.code]=true;
   if (e.code==="Space"||e.code==="Enter"){
     e.preventDefault();
@@ -2487,7 +2815,7 @@ addEventListener("keydown",e=>{
     else if (game.state==="flight") flare();
   }
 });
-addEventListener("keyup",e=>keys[e.code]=false);
+addEventListener("keyup",e=>{ if (typingInField(e)) return; keys[e.code]=false; });
 
 /* ====================== Hauptschleife ====================== */
 function frame(now){
@@ -2520,7 +2848,7 @@ function frame(now){
 rollWind();
 // Persistenz laden, dann Settings-Änderungen automatisch speichern
 loadState().then(()=>{
-  [sensEl,sndEl,commEl,aidEl].forEach(el=>el.addEventListener("change",saveState));
+  [sensEl,sndEl,commEl,factsEl,clipsEl,aidEl].forEach(el=>el.addEventListener("change",saveState));
   sensEl.addEventListener("change",saveState);
 });
 requestAnimationFrame(frame);
